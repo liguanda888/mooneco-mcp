@@ -12,8 +12,19 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # 工具链下载偶发失败（实测 6 次运行里出现过 1 次）。
-      # 这里重试 3 次；若全部失败仍然让步骤失败，不掩盖真实故障。
+      # Registry 索引是 https://mooncakes.io/git/index 上的一个 git 仓库（约 9 MB）。
+      # 不缓存的话每次 CI 都要重新克隆，从 Actions runner 访问偶发超时
+      # （实测出现过一次耗时 7 分 54 秒后失败）。
+      # 缓存后只需拉取增量，既快又稳。
+      - name: Cache MoonBit registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.moon/registry
+          key: moonbit-registry-${{ runner.os }}-${{ hashFiles('moon.mod') }}
+          restore-keys: |
+            moonbit-registry-${{ runner.os }}-
+
+      # 工具链下载是必需步骤，偶发失败时重试；全部失败则真的失败。
       - name: Set up MoonBit
         run: |
           ok=0
@@ -22,8 +33,8 @@ jobs:
               ok=1
               break
             fi
-            echo "MoonBit install attempt $i failed; retrying in 10s"
-            sleep 10
+            echo "MoonBit install attempt $i failed; retrying in 15s"
+            sleep 15
           done
           if [ "$ok" != "1" ]; then
             echo "MoonBit install failed after 3 attempts" >&2
@@ -31,29 +42,19 @@ jobs:
           fi
           echo "$HOME/.moon/bin" >> $GITHUB_PATH
 
-      # `moon update` 需要访问 registry，同样存在偶发失败。
+      # `moon update` 只是刷新 registry 索引，**不是**依赖是否可用的权威判据。
+      # 权威判据是下面的 `moon check` —— 依赖真装不上时它会失败。
+      # 因此这一步降级为非致命：否则一个"刷新索引"的动作会把整个构建判死。
       - name: Update dependencies
         run: |
-          ok=0
-          for i in 1 2 3; do
-            if moon update; then
-              ok=1
-              break
-            fi
-            echo "moon update attempt $i failed; retrying in 10s"
-            sleep 10
-          done
-          if [ "$ok" != "1" ]; then
-            echo "moon update failed after 3 attempts" >&2
-            exit 1
-          fi
+          moon update || echo "::warning::moon update failed; continuing with the cached registry"
 
-      # `moon version --all` 会联网查询各后端版本，偶发失败；
-      # 降级为非致命，失败时退回本地 `moon version`，
-      # 避免一个纯诊断步骤把整个构建判为失败。
+      # `moon version --all` 会联网查询各后端版本，纯诊断用途；
+      # 失败时退回本地 `moon version`。
       - name: Show toolchain version
         run: moon version --all || moon version
 
+      # 这一步才是真正的门禁：依赖解析不了、类型检查不过，都会在这里失败。
       - name: Check
         run: moon check
 
