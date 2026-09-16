@@ -144,6 +144,7 @@ the source and license will be stated here and in the file header.
 
 ## 项目文档
 
+- [可复现演示说明](docs/demo.md) —— **三条命令验证项目能跑**（评审先看这个）
 - [一页项目说明](docs/project-brief.md) —— 报名与评审材料
 - [AGENTS.md](AGENTS.md) —— 给 AI 编程代理的项目约定
 

@@ -60,6 +60,11 @@ jobs:
       - name: Build (native)
         run: moon build --target native
 
+      # 端到端验证协议行为（含"通知不得被回应"这类易错点）。
+      # 见 docs/demo.md —— 评审也可以本地复跑同一个脚本。
+      - name: MCP protocol smoke test
+        run: sh scripts/smoke.sh
+
       - name: Test (default target)
         run: moon test
 
