@@ -91,7 +91,7 @@ moon build --target native
 moon test
 
 # 4. Register in your MCP client
-#    Point Claude Code / Codex / Cursor at the built executable
+#    Point Claude Code, Codex, or any other MCP-compatible client at the built executable
 ```
 
 ---

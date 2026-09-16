@@ -35,7 +35,7 @@ MoonBit 生态已有 2000+ 个包，覆盖 Parquet、Protobuf、SQLite、MCP、T
 
 ## 三、目标用户与使用场景
 
-**用户**：用 Claude Code / Codex / Cursor 等 AI 编程工具写 MoonBit 的开发者。
+**用户**：用 Claude Code、Codex 以及其他 MCP 兼容客户端写 MoonBit 的开发者。
 
 **典型流程**（演示脚本）：
 > 开发者对 AI 说："用 MoonBit 解析 Parquet 并写入 SQLite。"
@@ -90,7 +90,7 @@ MoonBit 生态已有 2000+ 个包，覆盖 Parquet、Protobuf、SQLite、MCP、T
 | 9/19（周六） | `get_package_api` + `suggest_dependencies` | 待做 |
 | 9/20 | 排序权重调优 + 边界用例测试 | 待做 |
 | 9/21 | `pack_project_context`（import 相关性 + 包 API 注入） | 待做 |
-| 9/22 | 端到端测试 + 在 Claude/Codex 中实测接入 | 待做 |
+| 9/22 | 端到端测试 + 在 MCP 兼容客户端中实测接入 | 待做 |
 | 9/23 | README 完善、可复现演示说明、演示录屏、AI 使用说明 | 待做 |
 | 9/24 | 提交验收材料 | 待做 |
 

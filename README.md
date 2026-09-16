@@ -90,7 +90,7 @@ moon build --target native
 moon test
 
 # 4. 在 MCP 客户端中接入
-#    将构建出的可执行文件配置到 Claude Code / Codex / Cursor 的 MCP 配置中
+#    将构建出的可执行文件配置到 Claude Code、Codex 以及其他 MCP 兼容客户端中
 ```
 
 ---
