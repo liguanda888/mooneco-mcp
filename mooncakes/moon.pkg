@@ -1,0 +1,8 @@
+// mooncakes —— 生态包元数据的类型与解析（纯逻辑，与后端无关）
+//
+// 设计取舍：本包刻意不依赖网络与文件系统，因此可以在任意后端上跑测试。
+// 真正的 HTTPS 传输放在 `net/` 包（native-only）。
+
+import {
+  "moonbitlang/core/json",
+}

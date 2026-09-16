@@ -1,0 +1,29 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "liguanda888/mooneco/mooncakes"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn decode_search(StringView) -> Array[PackageHit]
+
+pub let fixture_search_parquet : String
+
+// Errors
+
+// Types and methods
+pub struct PackageHit {
+  name : String
+  version : String
+  license : String
+  repository : String
+  description : String
+  keywords : Array[String]
+  downloads : Int
+  created_at : String
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits
