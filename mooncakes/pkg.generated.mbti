@@ -13,7 +13,7 @@ pub let fixture_search_parquet : String
 // Errors
 
 // Types and methods
-pub struct PackageHit {
+pub(all) struct PackageHit {
   name : String
   version : String
   license : String
@@ -22,6 +22,7 @@ pub struct PackageHit {
   keywords : Array[String]
   downloads : Int
   created_at : String
+  is_new : Bool
 } derive(Eq, @debug.Debug)
 
 // Type aliases

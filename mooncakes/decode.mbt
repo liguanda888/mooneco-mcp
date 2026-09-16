@@ -36,7 +36,18 @@ fn decode_hit(item : Json) -> PackageHit? {
     keywords: field_string_array(obj, "keywords"),
     downloads: field_int(obj, "downloads"),
     created_at: field_string(obj, "created_at"),
+    is_new: field_bool(obj, "is_new"),
   })
+}
+
+///|
+/// 取布尔字段；缺失或类型不符时返回 false。
+fn field_bool(obj : Map[String, Json], key : String) -> Bool {
+  match obj.get(key) {
+    Some(True) => true
+    Some(False) => false
+    _ => false
+  }
 }
 
 ///|

@@ -1,0 +1,23 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "liguanda888/mooneco/rank"
+
+import {
+  "liguanda888/mooneco/mooncakes",
+}
+
+// Values
+pub fn ascii_lower(StringView) -> String
+
+pub fn package_leaf(StringView) -> String
+
+pub fn rank(Array[@mooncakes.PackageHit], StringView) -> Array[@mooncakes.PackageHit]
+
+pub fn score(@mooncakes.PackageHit, StringView) -> Int
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
