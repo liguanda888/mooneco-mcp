@@ -12,16 +12,44 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # 工具链下载偶发失败（实测 6 次运行里出现过 1 次）。
+      # 这里重试 3 次；若全部失败仍然让步骤失败，不掩盖真实故障。
       - name: Set up MoonBit
         run: |
-          curl -fsSL https://cli.moonbitlang.cn/install/unix.sh | bash
+          ok=0
+          for i in 1 2 3; do
+            if curl -fsSL --retry 3 --retry-delay 5 https://cli.moonbitlang.cn/install/unix.sh | bash; then
+              ok=1
+              break
+            fi
+            echo "MoonBit install attempt $i failed; retrying in 10s"
+            sleep 10
+          done
+          if [ "$ok" != "1" ]; then
+            echo "MoonBit install failed after 3 attempts" >&2
+            exit 1
+          fi
           echo "$HOME/.moon/bin" >> $GITHUB_PATH
 
+      # `moon update` 需要访问 registry，同样存在偶发失败。
       - name: Update dependencies
-        run: moon update
+        run: |
+          ok=0
+          for i in 1 2 3; do
+            if moon update; then
+              ok=1
+              break
+            fi
+            echo "moon update attempt $i failed; retrying in 10s"
+            sleep 10
+          done
+          if [ "$ok" != "1" ]; then
+            echo "moon update failed after 3 attempts" >&2
+            exit 1
+          fi
 
-      # `moon version --all` 会访问网络查询各后端版本，偶发失败；
-      # 这里降级为非致命，失败时退回本地 `moon version`，
+      # `moon version --all` 会联网查询各后端版本，偶发失败；
+      # 降级为非致命，失败时退回本地 `moon version`，
       # 避免一个纯诊断步骤把整个构建判为失败。
       - name: Show toolchain version
         run: moon version --all || moon version
