@@ -1,10 +1,15 @@
-// cmd/main —— MCP Server 可执行入口
+// cmd/main —— MCP Server 可执行入口（STDIO 传输层）
 //
-// 当前为 M0 骨架：仅打印版本信息，用于验证构建与运行链路。
-// M2 里程碑将替换为真正的 MCP STDIO 事件循环。
+// 这里只负责"读一行、分发、写一行"：
+// 协议逻辑全在 `mcp/` 包里，因此可以脱离进程被测试。
+// 本包因为用到异步 STDIO，限定为 native。
 
 import {
-  "liguanda888/mooneco",
+  "liguanda888/mooneco/mcp",
+  "moonbitlang/async",
+  "moonbitlang/async/stdio",
 }
+
+supported_targets = "+native"
 
 pkgtype(kind: "executable")
