@@ -1,7 +1,11 @@
-﻿# MoonBit build artifacts
+# MoonBit build artifacts
 target/
+target
 _build/
 .mooncakes/
+.moonagent/
+
+# MoonBit generated wasm output
 *.wasm
 *.wat
 
