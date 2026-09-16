@@ -18,3 +18,7 @@ keywords = [ "mcp", "moonbit", "ai", "agent", "ecosystem", "context" ]
 description = "MCP server giving AI coding agents MoonBit ecosystem knowledge (package/API retrieval, dependency suggestion) and MoonBit-semantic context packing"
 
 preferred_target = "native"
+
+import {
+  "moonbitlang/async@0.22.1",
+}
