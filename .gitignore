@@ -1,0 +1,12 @@
+﻿# MoonBit build artifacts
+target/
+_build/
+.mooncakes/
+*.wasm
+*.wat
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

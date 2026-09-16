@@ -112,7 +112,7 @@ moon test
 
 ## 项目文档
 
-- [一页项目说明](docs/01-一页项目说明.md)
+- [一页项目说明](docs/project-brief.md)
 
 ## 许可证
 
