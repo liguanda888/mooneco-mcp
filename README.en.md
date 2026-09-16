@@ -1,13 +1,25 @@
-# MoonContext MCP
+# MoonEco MCP
 
-**An MCP server that gives AI coding agents accurate knowledge of the MoonBit ecosystem — and packs project context within a token budget.**
+**An MCP server that lets AI coding agents actually understand the MoonBit ecosystem.**
 
-The MoonBit ecosystem has 2000+ packages, but they are not in any model's training data. The result: AI invents non-existent APIs, or re-implements what already exists.
+The MoonBit ecosystem has 2000+ packages, but they are not in any model's training data. So agents invent non-existent APIs, or re-implement packages that already exist.
 
-MoonContext MCP hands the agent two things it lacks: **ecosystem knowledge** and **relevant project context**.
+MoonEco MCP lets an agent look up the **real packages and the real APIs** before it writes code, and hands it project context that is **MoonBit-semantic** and fits a token budget.
 
 > Entry for the **2026 MoonBit September Hackathon**. Licensed under [Apache-2.0](LICENSE).
 > 中文说明: [README.md](README.md)
+
+---
+
+## What Makes It Different
+
+| Feature | Description |
+|---|---|
+| 🔍 **Built-in ecosystem index** | Full mooncakes.io coverage, **intent-based** search with weighted ranking over name match, keywords, downloads and maintenance activity |
+| 🚫 **Zero-hallucination APIs** | Every API name and dependency edge comes from a real mooncakes.io response — **never from model memory** |
+| 🧠 **MoonBit-semantic context** | When packing project context it also injects the **API summaries and dependency edges of the packages the project actually uses**, because the tool understands MoonBit package structure rather than just slicing files |
+| 🔌 **Reproducible offline** | Local snapshot cache with TTL; tests run against recorded JSON fixtures, so a reviewer can re-run everything without network |
+| 🧩 **Pure MoonBit** | No FFI, 100% MoonBit, multi-backend ready |
 
 ---
 
@@ -25,10 +37,10 @@ MoonContext MCP hands the agent two things it lacks: **ecosystem knowledge** and
 
 | Tool | Description |
 |---|---|
-| `search_packages` | Search ecosystem packages by intent. Weighted ranking over name match, keywords, downloads and maintenance activity |
-| `get_package_api` | API summary, dependency table and README highlights for a given package |
+| `search_packages` | Search packages by intent, with download counts, licenses and maintenance activity |
+| `get_package_api` | API summary, dependency table and README highlights for a package |
 | `suggest_dependencies` | "I want to build X" → which packages to use, with alternatives compared |
-| `pack_project_context` | Compress a project into a token budget, selecting files by import relevance |
+| `pack_project_context` | Compress a project into a token budget, **injecting the API summaries of the packages it uses** |
 
 Tool `description` and `inputSchema` fields are written in **English** for best
 model compatibility and tool-calling accuracy.
@@ -48,7 +60,7 @@ The agent will:
 2. `get_package_api("mizchi/parquet", "0.2.1")`
    → real API surface and dependency table, no guessing
 3. `pack_project_context("./myproject", 32000)`
-   → import-ranked context that fits 32k tokens
+   → fits 32k tokens, with the real API summaries of those packages attached
 4. Write code against packages that **actually exist**.
 
 ---

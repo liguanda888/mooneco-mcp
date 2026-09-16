@@ -1,7 +1,7 @@
-# MoonContext MCP —— 让 AI 准确理解 MoonBit 生态
+# MoonEco MCP —— 让 AI 真正读懂 MoonBit 生态
 
 > 2026 MoonBit 九月黑客松 · 一页项目说明
-> 仓库：https://github.com/liguanda888/mooncontext-mcp ｜ 许可：Apache-2.0
+> 仓库：https://github.com/liguanda888/mooneco-mcp ｜ 许可：Apache-2.0
 
 ---
 
@@ -21,7 +21,19 @@ MoonBit 生态已有 2000+ 个包，覆盖 Parquet、Protobuf、SQLite、MCP、T
 
 ---
 
-## 二、目标用户与使用场景
+## 二、项目特色
+
+| 特色 | 说明 |
+|---|---|
+| **内置生态索引** | 覆盖 mooncakes.io 全量包，按**意图**检索，融合名称匹配、关键词、下载量、维护活跃度加权排序 |
+| **零幻觉 API** | 所有 API 名称与依赖关系都来自 mooncakes.io 的真实返回，**不依赖模型记忆** |
+| **MoonBit 语义级上下文** | 打包项目上下文时，会把项目**实际用到的包的 API 摘要与依赖关系一并注入**——因为工具理解 MoonBit 的包结构，而不是单纯按文件切分 |
+| **离线可复现** | 本地快照缓存 + TTL；测试基于录制的 JSON fixture，不依赖实时网络 |
+| **纯 MoonBit 实现** | 无 FFI，全项目 MoonBit |
+
+---
+
+## 三、目标用户与使用场景
 
 **用户**：用 Claude Code / Codex / Cursor 等 AI 编程工具写 MoonBit 的开发者。
 
@@ -33,25 +45,25 @@ MoonBit 生态已有 2000+ 个包，覆盖 Parquet、Protobuf、SQLite、MCP、T
 2. AI 调 `get_package_api("mizchi/parquet", "0.2.1")`
    → 返回 API 摘要与依赖，AI 不再靠猜
 3. AI 调 `pack_project_context("./myproject", 32000)`
-   → 按 import 相关性排序，把项目压进 32k token 预算
-4. AI 基于**真实**的包与上下文写代码
+   → 按 import 相关性排序，把项目压进 32k token 预算，**并附上这些包的真实 API 摘要**
+4. AI 基于**真实存在**的包与 API 写代码
 
 ---
 
-## 三、交付物：4 个 MCP 工具
+## 四、交付物：4 个 MCP 工具
 
 | 工具 | 作用 |
 |---|---|
-| `search_packages(intent, limit)` | 按意图检索生态包，融合名称匹配、关键词、下载量、维护活跃度加权排序 |
+| `search_packages(intent, limit)` | 按意图检索生态包，带下载量、许可证与维护活跃度 |
 | `get_package_api(name, version)` | 返回指定包的 API 摘要、依赖表、README 要点 |
 | `suggest_dependencies(requirement)` | 「我要做 X」→ 反查该用哪些包，并给出替代方案对比 |
-| `pack_project_context(path, budget)` | 把项目压缩进 token 预算，按 import 相关性排序选取文件 |
+| `pack_project_context(path, budget)` | 把项目压进 token 预算，**同时注入所用包的 API 摘要**，让上下文自带生态知识 |
 
 **形态**：一个 MCP Server（STDIO 传输），可在任意支持 MCP 的客户端中一行配置接入。
 
 ---
 
-## 四、技术路线
+## 五、技术路线
 
 - **主实现语言：MoonBit**（全项目纯 MoonBit，无 FFI，满足验收标准第 1 条）
 - **协议**：MCP（Model Context Protocol），STDIO + JSON-RPC 2.0
@@ -59,26 +71,28 @@ MoonBit 生态已有 2000+ 个包，覆盖 Parquet、Protobuf、SQLite、MCP、T
   - `GET /api-new/v0/search?kw=<关键词>&limit=N` → 名称/版本/许可证/仓库/关键词/描述/下载量/匹配片段
   - `GET /api-new/v0/modules/<owner>/<name>` → 含 `deps` 依赖表与 README
 - **缓存**：本地快照 + TTL 过期，保证**断网也能复现**（验收标准第 3 条）
-- **测试**：单元测试（JSON 解析、排序权重、token 估算）+ 端到端测试（基于固定 API 快照，不依赖实时网络）
+- **测试**：单元测试（JSON 解析、排序权重、token 估算）+ 端到端测试（基于**录制的 API fixture**，不依赖实时网络）
 - **可复现**：`moon build` → `moon test` → 一行 MCP 配置，三步可复现
 
-**依赖说明**：MCP 协议层计划复用社区包 `colmugx/mcp`（类型安全 MCP SDK，支持 STDIO/HTTP 双传输）；
-若其 API 不满足需求，则自行实现最小 JSON-RPC 2.0 层。两种路线均在 README 中标注来源与许可证。
+**依赖说明**：协议层计划复用社区包 `marianoguerra/mcp`（零依赖，含 JSON-RPC codec 与 MCP 类型）；
+若其 API 不满足需求，则自行实现最小 JSON-RPC 2.0 层。两种路线均在 README 的
+`Dependencies & Attribution` 小节标注来源与许可证。
 
 ---
 
-## 五、9/17–9/24 交付计划（8 天）
+## 六、9/16–9/24 交付计划
 
-| 日期 | 目标 |
-|---|---|
-| 9/17 | 仓库骨架、moon.mod、CI 跑通、README/LICENSE |
-| 9/18 | mooncakes API 客户端 + 本地缓存 + 单元测试 |
-| 9/19（周六） | MCP Server 骨架（initialize / tools/list / tools/call）+ `search_packages` |
-| 9/20 | `get_package_api` + `suggest_dependencies` |
-| 9/21 | `pack_project_context`（简化版：import 相关性 + token 预算切分） |
-| 9/22 | 端到端测试 + 在 Claude/Codex 中实测接入 |
-| 9/23 | README 完善、可复现演示说明、演示录屏、AI 使用说明 |
-| 9/24 | 提交验收材料 |
+| 日期 | 目标 | 状态 |
+|---|---|---|
+| 9/16 | 仓库骨架、`moon.mod`、构建与测试跑通、CI | ✅ 已完成 |
+| 9/17 | mooncakes API 客户端 + 本地快照缓存 + fixture 测试 | 待做 |
+| 9/18 | MCP Server 骨架（`initialize` / `tools/list` / `tools/call`）+ `search_packages` | 待做 |
+| 9/19（周六） | `get_package_api` + `suggest_dependencies` | 待做 |
+| 9/20 | 排序权重调优 + 边界用例测试 | 待做 |
+| 9/21 | `pack_project_context`（import 相关性 + 包 API 注入） | 待做 |
+| 9/22 | 端到端测试 + 在 Claude/Codex 中实测接入 | 待做 |
+| 9/23 | README 完善、可复现演示说明、演示录屏、AI 使用说明 | 待做 |
+| 9/24 | 提交验收材料 | 待做 |
 
 **验收线（9/24 必须达到）**：4 个工具可用、测试通过、README 可让评审独立跑起来、演示录屏。
 
@@ -86,7 +100,7 @@ MoonBit 生态已有 2000+ 个包，覆盖 Parquet、Protobuf、SQLite、MCP、T
 
 ---
 
-## 六、AI 使用说明（对应验收标准第 6 条「AI 可解释」）
+## 七、AI 使用说明（对应验收标准第 6 条「AI 可解释」）
 
 本项目全程使用 AI 辅助编码，但**目标、架构、技术选型与质量边界由本人把控**，具体体现在：
 
@@ -96,20 +110,20 @@ MoonBit 生态已有 2000+ 个包，覆盖 Parquet、Protobuf、SQLite、MCP、T
 
 ---
 
-## 七、风险与应对
+## 八、风险与应对
 
 | 风险 | 应对 |
 |---|---|
 | mooncakes API 变更或限流 | 本地快照缓存兜底；接口层做适配封装，便于替换 |
-| MoonBit 的 STDIN/STDOUT 逐行处理不满足 MCP 需求 | 已有社区证据表明可行（`bobzhang/cat` 等 CLI 工具）；退路是改用 MCP 的 Streamable HTTP 传输 |
+| MoonBit 的 STDIN/STDOUT 逐行处理不满足 MCP 需求 | 已有社区证据表明可行；退路是改用 MCP 的 Streamable HTTP 传输 |
 | 8 天时间紧（工作日仅晚间） | 范围已按「月度必做 / 季度再扩」切分；优先保证可验收的完整闭环 |
-| 依赖第三方包的许可证合规 | README 与 NOTICE 中明确标注来源与许可证（验收标准第 5 条） |
+| 依赖第三方包的许可证合规 | README 的 `Dependencies & Attribution` 小节明确标注来源与许可证（验收标准第 5 条） |
 
 ---
 
-## 八、开源与成果
+## 九、开源与成果
 
-- 仓库公开：https://github.com/liguanda888/mooncontext-mcp
+- 仓库公开：https://github.com/liguanda888/mooneco-mcp
 - 许可证：Apache-2.0（OSI 认证）
 - 保留完整开发历史（commits / Issues / PR）
 - 项目目标不止于参赛：MoonBit 生态持续增长，**「让 AI 准确理解生态」是一类长期需要的基础设施**

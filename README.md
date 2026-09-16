@@ -1,19 +1,31 @@
-# MoonContext MCP
+# MoonEco MCP
 
-**让 AI 准确理解 MoonBit 生态的 MCP Server。**
+**让 AI 真正读懂 MoonBit 生态的 MCP Server。**
 
-MoonBit 生态已有 2000+ 个包，但它们不在大模型的训练数据里。结果就是 AI 写 MoonBit 时会**编造不存在的 API**，或者**重复造轮子**。
+MoonBit 生态已有 2000+ 个包，但它们不在大模型的训练数据里。结果是 AI 写 MoonBit 时会**编造不存在的 API**，或者**重复实现生态里早就有的包**。
 
-MoonContext MCP 把「生态知识」和「项目上下文」这两件事交给 AI —— 一个 MCP Server，四个工具。
+MoonEco MCP 让 AI 在动手写代码之前，先查到**真实的包、真实的 API**，并在 token 预算内拿到**理解 MoonBit 语义**的项目上下文。
 
 > 本项目参加 **2026 MoonBit 九月黑客松**。许可：[Apache-2.0](LICENSE)。
 > English version: [README.en.md](README.en.md)
 
 ---
 
+## 我们的特色
+
+| 特色 | 说明 |
+|---|---|
+| 🔍 **内置生态索引** | 覆盖 mooncakes.io 全量包，按**意图**检索，融合名称匹配、关键词、下载量、维护活跃度加权排序 |
+| 🚫 **零幻觉 API** | 所有 API 名称与依赖关系都来自 mooncakes.io 的真实返回，**不依赖模型记忆** |
+| 🧠 **MoonBit 语义级上下文** | 打包项目上下文时，会把项目**实际用到的包的 API 摘要与依赖关系一并注入** —— 因为工具理解 MoonBit 的包结构，而不是单纯按文件切分 |
+| 🔌 **离线可复现** | 本地快照缓存 + TTL；测试基于录制的 JSON fixture，不依赖实时网络，评审可独立复跑 |
+| 🧩 **纯 MoonBit 实现** | 无 FFI，全项目 MoonBit，多后端可用 |
+
+---
+
 ## 解决什么问题
 
-| 痛点 | 表现 | MoonContext 的答案 |
+| 痛点 | 表现 | MoonEco 的答案 |
 |---|---|---|
 | AI 不知道生态里有什么 | 幻觉 API、手写已有轮子 | `search_packages` / `suggest_dependencies` |
 | AI 不知道某个包怎么用 | 猜函数签名、猜参数 | `get_package_api` |
@@ -25,12 +37,12 @@ MoonContext MCP 把「生态知识」和「项目上下文」这两件事交给 
 
 | 工具 | 说明 |
 |---|---|
-| `search_packages` | 按意图检索生态包。融合名称匹配、关键词、下载量、维护活跃度加权排序 |
+| `search_packages` | 按意图检索生态包，带下载量、许可证与维护活跃度 |
 | `get_package_api` | 返回指定包的 API 摘要、依赖表与 README 要点 |
 | `suggest_dependencies` | 「我要做 X」→ 反查该用哪些包，并给出替代方案对比 |
-| `pack_project_context` | 把项目压缩进 token 预算，按 import 相关性排序选取文件 |
+| `pack_project_context` | 把项目压缩进 token 预算；**同时注入所用包的 API 摘要**，让上下文自带生态知识 |
 
-工具的 `description` 与 `inputSchema` 均使用**英文**描述 —— 因为它们由 AI 模型消费，英文的模型兼容性与调用准确率更好。
+工具的 `description` 与 `inputSchema` 均使用**英文** —— 它们由 AI 模型消费，英文的模型兼容性与调用准确率更好。
 
 ---
 
@@ -47,8 +59,8 @@ AI 会自动：
 2. 调用 `get_package_api("mizchi/parquet", "0.2.1")`
    → 真实 API 摘要与依赖表，不再靠猜
 3. 调用 `pack_project_context("./myproject", 32000)`
-   → 按 import 相关性压进 32k token 预算
-4. 基于**真实**的包与上下文写代码
+   → 压进 32k token 预算，并附带这些包的真实 API 摘要
+4. 基于**真实存在**的包与 API 写代码
 
 ---
 
@@ -91,7 +103,7 @@ listed below (required by the contest's open-source compliance criterion).
 
 | Package | Version | License | Purpose |
 |---|---|---|---|
-| [`colmugx/mcp`](https://mooncakes.io/docs/colmugx/mcp) | TBD | TBD | MCP protocol layer (STDIO/HTTP transport), **planned** |
+| [`marianoguerra/mcp`](https://mooncakes.io/docs/marianoguerra/mcp) | TBD | TBD | MCP protocol types + JSON-RPC codec, **planned** |
 
 **Data source attribution:** ecosystem metadata is retrieved from
 [mooncakes.io](https://mooncakes.io) public JSON API. This project is not
@@ -106,11 +118,11 @@ the source and license will be stated here and in the file header.
 
 | 阶段 | 内容 | 状态 |
 |---|---|---|
-| M0 | 仓库骨架、`moon.mod.json`、构建与测试跑通 | 🚧 |
-| M1 | mooncakes API 客户端 + 本地缓存 + 单元测试 | ⬜ |
+| M0 | 仓库骨架、`moon.mod`、构建与测试跑通、CI | ✅ |
+| M1 | mooncakes API 客户端 + 本地快照缓存 + fixture 测试 | 🚧 |
 | M2 | MCP Server 骨架（`initialize` / `tools/list` / `tools/call`）+ `search_packages` | ⬜ |
 | M3 | `get_package_api` + `suggest_dependencies` | ⬜ |
-| M4 | `pack_project_context` | ⬜ |
+| M4 | `pack_project_context`（import 相关性 + 包 API 注入） | ⬜ |
 | M5 | 端到端测试 + 在 MCP 客户端实测接入 | ⬜ |
 | M6 | 文档、可复现演示说明、演示录屏 | ⬜ |
 
@@ -133,6 +145,7 @@ the source and license will be stated here and in the file header.
 ## 项目文档
 
 - [一页项目说明](docs/project-brief.md) —— 报名与评审材料
+- [AGENTS.md](AGENTS.md) —— 给 AI 编程代理的项目约定
 
 ## 许可证
 

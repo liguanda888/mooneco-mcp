@@ -4,7 +4,7 @@
 // M2 里程碑将替换为真正的 MCP STDIO 事件循环。
 
 import {
-  "liguanda888/mooncontext",
+  "liguanda888/mooneco",
 }
 
 pkgtype(kind: "executable")
