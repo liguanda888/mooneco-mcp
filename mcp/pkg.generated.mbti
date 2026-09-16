@@ -1,0 +1,46 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "liguanda888/mooneco/mcp"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn error_response(Json, Int, String) -> String
+
+pub fn handle_message(StringView) -> String?
+
+pub fn handle_tools_call(Json, Json?) -> String
+
+pub fn initialize_result() -> String
+
+pub let invalid_params_code : Int
+
+pub let invalid_request_code : Int
+
+pub let method_not_found_code : Int
+
+pub let parse_error_code : Int
+
+pub fn parse_request(StringView) -> RpcRequest?
+
+pub let protocol_version : String
+
+pub fn success_response(Json, String) -> String
+
+pub let tool_names : Array[String]
+
+pub let tools_list_result : String
+
+// Errors
+
+// Types and methods
+pub(all) struct RpcRequest {
+  method_name : String
+  id : Json?
+  params : Json?
+} derive(@debug.Debug)
+
+// Type aliases
+
+// Traits

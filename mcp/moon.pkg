@@ -1,0 +1,11 @@
+// mcp —— MCP 协议层（纯逻辑）
+//
+// 设计取舍：**协议逻辑与传输分离**。
+// 本包不碰 stdin/stdout、不碰网络，因此可以在任意后端上完整单元测试；
+// 真正的 STDIO 事件循环放在 `cmd/main`（native）。
+// 这样"协议是否正确"可以脱离进程与环境被验证。
+
+import {
+  "liguanda888/mooneco",
+  "moonbitlang/core/json",
+}
