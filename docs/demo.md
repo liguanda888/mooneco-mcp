@@ -113,15 +113,37 @@ npx @modelcontextprotocol/inspector _build/native/debug/build/cmd/main/main
 |---|---|
 | MCP 协议层（`initialize` / `tools/list` / 通知 / 错误码） | ✅ 已实现并测试 |
 | 工具清单（四个工具的英文描述与入参 schema） | ✅ 已实现并测试 |
-| mooncakes.io 响应解析（宽容解析） | ✅ 已实现并测试（41 个测试） |
+| mooncakes.io 响应解析（宽容解析） | ✅ 已实现并测试 |
 | 相关性打分与稳定排序 | ✅ 已实现并测试 |
 | HTTPS 客户端（原生，无 FFI） | ✅ 已实现 |
-| `tools/call` 的具体实现 | 🚧 骨架：返回可解释的"尚未实现"错误 |
+| **`tools/call` → `search_packages`** | ✅ **已实现，联网检索真实生效** |
+| `tools/call` → 其余三个工具 | 🚧 返回可解释的"尚未实现"错误 |
 | 本地快照缓存 | 🚧 计划中 |
 | `pack_project_context` | 🚧 计划中 |
 
-`tools/call` 目前会回一条**协议级错误**而不是超时或崩溃——
-这样客户端拿到的失败是可解释的。
+`search_packages` 的真实输出（可直接复跑）：
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_packages","arguments":{"intent":"parquet","limit":3}}}' \
+| _build/native/debug/build/cmd/main/main
+```
+
+```
+2 package(s) for "parquet":
+
+1. mizchi/parquet @ 0.2.1 — Apache-2.0, 1676 downloads, published 2026-04-25
+   Parquet reader/writer for MoonBit.
+   https://github.com/mizchi/parquet
+
+2. codeworm96/magpiedb @ 0.2.0 — Apache-2.0, 29 downloads, published 2026-04-20
+   vibe coded lightweight OLAP database
+   https://github.com/codeworm96/magpiedb
+
+Use get_package_api to read the real API surface of one of these before writing code.
+```
+
+未实现的工具会回一条**协议级可解释的失败结果**（`isError: true`）而不是超时或崩溃——
+这样客户端拿到的失败是能读懂、能应对的。
 
 ---
 

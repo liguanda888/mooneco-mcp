@@ -1,8 +1,45 @@
 ///|
-/// 白盒测试：MCP 协议行为。
+/// 白盒测试：MCP 协议行为、工具结果渲染。
 ///
-/// **纯逻辑、不触网、不起进程** —— 这正是把协议层与 STDIO 传输分开的收益：
+/// **纯逻辑、不触网、不起进程** —— 这正是把协议层与传输/执行分开的收益：
 /// 协议是否正确可以独立验证，评审也不需要任何外部环境。
+
+///|
+/// 测试辅助：把 dispatch 的结果收敛成"要写出的 JSON"。
+/// 通知返回 None；工具调用在协议层不产生 JSON，用占位符表示以便断言分发正确。
+fn respond(text : StringView) -> String? {
+  match dispatch(text) {
+    Respond(json) => Some(json)
+    NoResponse => None
+    CallTool(_, _, _) => Some("<call-tool>")
+  }
+}
+
+///|
+/// 测试辅助：构造包元数据，避免每个用例重复写全字段。
+fn hit(
+  name : String,
+  description? : String = "",
+  downloads? : Int = 0,
+  license? : String = "Apache-2.0",
+  repository? : String = "",
+  created_at? : String = "2026-04-25T11:15:48",
+  is_new? : Bool = false,
+) -> @mooncakes.PackageHit {
+  {
+    name,
+    version: "0.2.1",
+    license,
+    repository,
+    description,
+    keywords: [],
+    downloads,
+    created_at,
+    is_new,
+  }
+}
+
+// ---------------------------------------------------------------- 请求解析
 
 ///|
 test "parse_request reads method and id" {
@@ -47,12 +84,11 @@ test "parse_request requires a method" {
   assert_true(parse_request("{\"jsonrpc\":\"2.0\",\"id\":1}") is None)
 }
 
+// ---------------------------------------------------------------- 分发
+
 ///|
-test "handle_message answers initialize" {
-  let out = handle_message(
-    "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}",
-  )
-  match out {
+test "dispatch answers initialize" {
+  match respond("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}") {
     Some(text) => {
       assert_true(text.contains("\"protocolVersion\""))
       assert_true(text.contains("mooneco-mcp"))
@@ -63,17 +99,17 @@ test "handle_message answers initialize" {
 }
 
 ///|
-test "handle_message does not answer notifications" {
+test "dispatch does not answer notifications" {
   // MCP 客户端在 initialize 之后会发这条通知，规范要求不得回应。
-  let out = handle_message(
-    "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}",
+  assert_true(
+    respond("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}")
+    is None,
   )
-  assert_true(out is None)
 }
 
 ///|
-test "handle_message returns a parse error for garbage" {
-  match handle_message("not json") {
+test "dispatch returns a parse error for garbage" {
+  match respond("not json") {
     Some(text) => {
       assert_true(text.contains("-32700"))
       assert_true(text.contains("\"id\":null"))
@@ -83,8 +119,8 @@ test "handle_message returns a parse error for garbage" {
 }
 
 ///|
-test "handle_message reports unknown methods" {
-  match handle_message("{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"nope\"}") {
+test "dispatch reports unknown methods" {
+  match respond("{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"nope\"}") {
     Some(text) => {
       assert_true(text.contains("-32601"))
       assert_true(text.contains("nope"))
@@ -95,8 +131,7 @@ test "handle_message reports unknown methods" {
 
 ///|
 test "tools/list advertises all four tools" {
-  match
-    handle_message("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}") {
+  match respond("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}") {
     Some(text) =>
       for name in tool_names {
         assert_true(text.contains("\"name\":\"" + name + "\""))
@@ -106,18 +141,49 @@ test "tools/list advertises all four tools" {
 }
 
 ///|
-test "tools/call without a tool name is an invalid-params error" {
-  match
-    handle_message("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\"}") {
+test "tools/call is delegated to the caller instead of executed" {
+  // 协议层不执行工具——它只报告"需要执行哪个工具、参数是什么"。
+  let out = dispatch(
+    "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"search_packages\",\"arguments\":{\"intent\":\"parquet\",\"limit\":5}}}",
+  )
+  match out {
+    CallTool(id, name, args) => {
+      assert_eq(name, "search_packages")
+      assert_true(id is Number(_))
+      assert_eq(arg_string(args, "intent"), Some("parquet"))
+      assert_eq(arg_int(args, "limit"), Some(5))
+    }
+    _ => assert_true(false)
+  }
+}
+
+///|
+test "tools/call without a name is an invalid-params error" {
+  match respond("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\"}") {
     Some(text) => assert_true(text.contains("-32602"))
     None => assert_true(false)
   }
 }
 
 ///|
+test "tools/call with missing arguments yields None for that key" {
+  let out = dispatch(
+    "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"search_packages\",\"arguments\":{}}}",
+  )
+  match out {
+    CallTool(_, _, args) => {
+      assert_true(arg_string(args, "intent") is None)
+      assert_true(arg_int(args, "limit") is None)
+    }
+    _ => assert_true(false)
+  }
+}
+
+// ---------------------------------------------------------------- 工具目录
+
+///|
 test "the tool catalogue is valid JSON with four complete entries" {
   // 直接解析字面量：手拼 JSON 最容易出语法错，这里把它钉住。
-  // 解析失败时 parsed 为 None，tools 退化成空数组 —— 断言会失败并指出问题。
   let parsed : Json? = Some(@json.parse(tools_list_result)) catch { _ => None }
   let tools = match parsed {
     Some(Object(m)) =>
@@ -143,4 +209,58 @@ test "the tool catalogue is valid JSON with four complete entries" {
 ///|
 test "initialize result exposes the module version" {
   assert_true(initialize_result().contains(@mooneco.version))
+}
+
+// ---------------------------------------------------------------- 结果渲染
+
+///|
+test "tool_result wraps text in the MCP content shape" {
+  let out = tool_result(@json.to_json(1), "hello", is_error=false)
+  assert_true(out.contains("\"content\":[{\"type\":\"text\""))
+  assert_true(out.contains("\"isError\":false"))
+  // 文本必须被正确转义
+  let escaped = tool_result(@json.to_json(1), "say \"hi\"", is_error=false)
+  assert_true(escaped.contains("say \\\"hi\\\""))
+}
+
+///|
+test "tool_result marks failures" {
+  assert_true(
+    tool_result(@json.to_json(1), "boom", is_error=true).contains(
+      "\"isError\":true",
+    ),
+  )
+}
+
+///|
+test "render_search_results reports each package with its facts" {
+  let text = render_search_results("parquet", [
+    hit(
+      "mizchi/parquet",
+      description="Parquet reader/writer for MoonBit.",
+      downloads=1676,
+      repository="https://github.com/mizchi/parquet",
+    ),
+  ])
+  assert_true(text.contains("mizchi/parquet @ 0.2.1"))
+  assert_true(text.contains("Apache-2.0"))
+  assert_true(text.contains("1676 downloads"))
+  assert_true(text.contains("2026-04-25"))
+  assert_true(text.contains("Parquet reader/writer for MoonBit."))
+  assert_true(text.contains("https://github.com/mizchi/parquet"))
+  // 结尾应引导模型使用下一个工具
+  assert_true(text.contains("get_package_api"))
+}
+
+///|
+test "render_search_results explains an empty result" {
+  let text = render_search_results("zzzz", [])
+  assert_true(text.contains("No package matched"))
+  assert_true(text.contains("zzzz"))
+}
+
+///|
+test "render_search_results marks new packages" {
+  let text = render_search_results("x", [hit("a/b", is_new=true)])
+  assert_true(text.contains("[new]"))
 }

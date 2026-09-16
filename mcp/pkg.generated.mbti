@@ -2,15 +2,18 @@
 package "liguanda888/mooneco/mcp"
 
 import {
+  "liguanda888/mooneco/mooncakes",
   "moonbitlang/core/debug",
 }
 
 // Values
+pub fn arg_int(Json?, String) -> Int?
+
+pub fn arg_string(Json?, String) -> String?
+
+pub fn dispatch(StringView) -> Outcome
+
 pub fn error_response(Json, Int, String) -> String
-
-pub fn handle_message(StringView) -> String?
-
-pub fn handle_tools_call(Json, Json?) -> String
 
 pub fn initialize_result() -> String
 
@@ -26,15 +29,29 @@ pub fn parse_request(StringView) -> RpcRequest?
 
 pub let protocol_version : String
 
+pub fn render_search_results(StringView, Array[@mooncakes.PackageHit]) -> String
+
 pub fn success_response(Json, String) -> String
 
+pub fn tool_arguments(Json?) -> Json?
+
+pub fn tool_name(Json?) -> String?
+
 pub let tool_names : Array[String]
+
+pub fn tool_result(Json, String, is_error? : Bool) -> String
 
 pub let tools_list_result : String
 
 // Errors
 
 // Types and methods
+pub(all) enum Outcome {
+  Respond(String)
+  NoResponse
+  CallTool(Json, String, Json?)
+} derive(@debug.Debug)
+
 pub(all) struct RpcRequest {
   method_name : String
   id : Json?
