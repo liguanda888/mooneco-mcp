@@ -97,9 +97,14 @@ pub fn render_search_results(
 ///
 /// **必须如实说明能力边界**：mooncakes.io 的公开 API 不提供函数签名，
 /// 也不提供 README 正文（`metadata.readme` 只是文件名）。
-/// 所以这里报告能拿到的事实，并明确指向仓库 README —— 而不是编一份
-/// 看起来很专业的"API 摘要"。让模型去读真实来源，比给它编的摘要安全。
-pub fn render_package_detail(detail : @mooncakes.PackageDetail) -> String {
+///
+/// 解决办法不是编一份"API 摘要"，而是**把仓库 README 取回来交给模型**——
+/// MoonBit 包的 API 用法恰恰写在 README 里。`readme` 参数就是上层
+/// 通过 `net.fetch_readme` 取到的正文；取不到时降级为只给事实 + 明确说明。
+pub fn render_package_detail(
+  detail : @mooncakes.PackageDetail,
+  readme? : String? = None,
+) -> String {
   let buf = StringBuilder::StringBuilder()
   buf.write_string(detail.module_name)
   buf.write_string(" @ ")
@@ -140,16 +145,112 @@ pub fn render_package_detail(detail : @mooncakes.PackageDetail) -> String {
   buf.write_string(", newest first):\n  ")
   buf.write_string(detail.versions.join(", "))
   buf.write_string("\n")
-  buf.write_string(
-    "\nNote: the mooncakes.io API exposes no function signatures, so this tool cannot list the API surface. Read the repository README for that",
-  )
-  if detail.repository != "" {
-    buf.write_string(": ")
-    buf.write_string(detail.repository)
-  } else {
-    buf.write_string(".")
+  match readme {
+    Some(text) => {
+      buf.write_string("\n")
+      buf.write_string(render_readme_highlights(text, detail.repository))
+    }
+    None => {
+      // 降级路径也要说清楚为什么没有 —— 模型据此知道该去哪里找。
+      buf.write_string(
+        "\nREADME: could not be fetched from the repository, so the API surface is not included here.",
+      )
+      if detail.repository != "" {
+        buf.write_string(" Read it at: ")
+        buf.write_string(detail.repository)
+      }
+      buf.write_string("\n")
+    }
   }
   buf.to_string()
+}
+
+///|
+/// README 正文的字符上限。
+///
+/// 为什么截断：README 动辄上万字符，整份塞进上下文会挤掉真正需要的内容。
+/// 前若干字符通常已覆盖标题、简介、安装与快速上手 —— 也就是最像
+/// "怎么用这个包"的部分；同时用章节导航告诉模型后面还有什么。
+pub let readme_char_limit : Int = 1800
+
+///|
+/// 渲染 README 要点：**章节导航 + 正文前若干字符**。
+///
+/// 章节导航是"要点"里信息密度最高的部分：它让模型一眼看到这份 README
+/// 是否讲了 API、用法、限制，从而决定要不要去读全文。
+pub fn render_readme_highlights(readme : StringView, source : String) -> String {
+  let buf = StringBuilder::StringBuilder()
+  let headings = extract_headings(readme)
+  if headings.length() > 0 {
+    buf.write_string("README sections: ")
+    buf.write_string(headings.join(" | "))
+    buf.write_string("\n")
+  }
+  let total = char_count(readme)
+  buf.write_string("\nREADME content")
+  if total > readme_char_limit {
+    buf.write_string(" (first ")
+    buf.write_string(readme_char_limit.to_string())
+    buf.write_string(" of ")
+    buf.write_string(total.to_string())
+    buf.write_string(" characters)")
+  }
+  buf.write_string(":\n")
+  buf.write_string(truncate_chars(readme, readme_char_limit))
+  if total > readme_char_limit {
+    buf.write_string("\n... (truncated)")
+    if source != "" {
+      buf.write_string(" Full README: ")
+      buf.write_string(source)
+    }
+  }
+  buf.write_string("\n")
+  buf.to_string()
+}
+
+///|
+/// 从 Markdown 提取章节标题（`#` 开头），最多 12 个。
+/// 同时兼容 `#` / `##` / `###`；空标题忽略。
+pub fn extract_headings(markdown : StringView) -> Array[String] {
+  let out : Array[String] = []
+  for line in markdown.split("\n") {
+    let trimmed = line.trim()
+    if trimmed.has_prefix("#") {
+      let title = trimmed.trim_start(chars="#").trim().to_owned()
+      if title != "" && out.length() < 12 {
+        out.push(title)
+      }
+    }
+  }
+  out
+}
+
+///|
+/// 按**字符数**截断（不是字节数）。
+///
+/// 为什么强调这一点：按字节切会把一个汉字切成两半，产出无效的 UTF-8。
+/// 逐字符写入天然对齐字符边界。
+pub fn truncate_chars(text : StringView, limit : Int) -> String {
+  let buf = StringBuilder::StringBuilder()
+  let mut count = 0
+  for ch in text {
+    if count >= limit {
+      break
+    }
+    buf.write_char(ch)
+    count = count + 1
+  }
+  buf.to_string()
+}
+
+///|
+/// 字符数（不是字节数）。
+pub fn char_count(text : StringView) -> Int {
+  let mut n = 0
+  for _ch in text {
+    n = n + 1
+  }
+  n
 }
 
 ///|

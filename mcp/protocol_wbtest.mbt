@@ -300,12 +300,83 @@ test "render_package_detail reports the verifiable facts" {
 }
 
 ///|
-test "render_package_detail is honest about the missing API surface" {
-  // 上游不提供函数签名。渲染必须把这一点说出来，并指向真实来源，
-  // 而不是编一份看起来很专业的"API 摘要"—— 这正是本项目的立意。
+test "render_package_detail says so when the README could not be fetched" {
+  // 取不到 README 时必须**明说**，并给出仓库地址 ——
+  // 而不是假装有一份 API 摘要。这是本项目的诚实底线。
   let text = render_package_detail(detail())
-  assert_true(text.contains("exposes no function signatures"))
-  assert_true(text.contains("Read the repository README"))
+  assert_true(text.contains("could not be fetched"))
+  assert_true(text.contains("Read it at"))
+  assert_true(text.contains("https://github.com/mizchi/parquet"))
+}
+
+///|
+test "render_package_detail includes README highlights when available" {
+  let readme = "# mizchi/parquet\n\nParquet reader/writer.\n\n## Usage\n\n```moonbit\nlet r = @parquet.read(bytes)\n```\n"
+  let text = render_package_detail(detail(), readme=Some(readme))
+  // 章节导航：让模型一眼看到这份 README 讲了什么
+  assert_true(text.contains("README sections: mizchi/parquet | Usage"))
+  assert_true(text.contains("README content"))
+  // 正文（含真实用法示例）必须带进来
+  assert_true(text.contains("@parquet.read(bytes)"))
+  // 有 README 时不应再出现"取不到"的降级提示
+  assert_true(!text.contains("could not be fetched"))
+}
+
+///|
+test "extract_headings pulls out markdown section titles" {
+  let md = "# Title\n\nsome text\n\n## Usage\n\n### Details\n\n## License\n"
+  assert_eq(extract_headings(md), ["Title", "Usage", "Details", "License"])
+}
+
+///|
+test "extract_headings ignores empty and plain lines" {
+  let md = "#\n\nplain text\n\n##\n\n## Real\n"
+  assert_eq(extract_headings(md), ["Real"])
+}
+
+///|
+test "extract_headings caps the number of headings" {
+  // 防止一份超长 README 的目录本身就把上下文吃掉
+  let buf = StringBuilder::StringBuilder()
+  for i in 0..<40 {
+    buf.write_string("## Section ")
+    buf.write_string(i.to_string())
+    buf.write_string("\n")
+  }
+  assert_eq(extract_headings(buf.to_string()).length(), 12)
+}
+
+///|
+test "truncate_chars counts characters not bytes" {
+  // 关键：按字节截会把汉字切成两半，产出无效 UTF-8。
+  assert_eq(truncate_chars("中文中文", 2), "中文")
+  assert_eq(truncate_chars("中文", 10), "中文")
+  assert_eq(truncate_chars("abcd", 3), "abc")
+}
+
+///|
+test "char_count counts characters not bytes" {
+  assert_eq(char_count("中文"), 2)
+  assert_eq(char_count("abc"), 3)
+  assert_eq(char_count(""), 0)
+}
+
+///|
+test "render_readme_highlights notes truncation and the source" {
+  let long = StringBuilder::StringBuilder()
+  for _i in 0..<(readme_char_limit + 50) {
+    long.write_string("x")
+  }
+  let text = render_readme_highlights(long.to_string(), "https://example.com/r")
+  assert_true(text.contains("truncated"))
+  assert_true(text.contains("Full README: https://example.com/r"))
+}
+
+///|
+test "render_readme_highlights does not mention truncation for short readmes" {
+  let text = render_readme_highlights("# T\n\nshort body\n", "")
+  assert_true(!text.contains("truncated"))
+  assert_true(text.contains("short body"))
 }
 
 ///|

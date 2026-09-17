@@ -74,3 +74,79 @@ fn is_unreserved(ch : Char) -> Bool {
   ch == '.' ||
   ch == '~'
 }
+
+// ---------------------------------------------------------------- README 地址
+
+///|
+/// 从仓库地址提取 `(owner, repo)`。
+///
+/// 已实测支持以下几种写法（其余返回 `None` —— **不猜**别的托管平台的规律）：
+/// - `https://github.com/owner/repo`
+/// - `https://github.com/owner/repo/`
+/// - `https://github.com/owner/repo.git`
+/// - `git@github.com:owner/repo.git`
+///
+/// 只认 github.com：README 我们从 GitHub 的 raw 地址取，其它平台规律未经验证，
+/// 宁可返回 `None` 让上层降级，也不拼一个可能错的地址。
+pub fn github_owner_repo(repository : StringView) -> (String, String)? {
+  let path = match github_path(repository) {
+    Some(p) => p
+    None => return None
+  }
+  let parts : Array[String] = []
+  for segment in path.split("/") {
+    let s = segment.trim().to_owned()
+    if s != "" {
+      parts.push(s)
+    }
+  }
+  if parts.length() < 2 {
+    return None
+  }
+  let owner = parts[0]
+  let repo = strip_git_suffix(parts[1])
+  if owner == "" || repo == "" {
+    return None
+  }
+  Some((owner, repo))
+}
+
+///|
+/// 去掉仓库地址的前缀，留下 `owner/repo/...` 部分。
+fn github_path(repository : StringView) -> StringView? {
+  match repository.strip_prefix("https://github.com/") {
+    Some(rest) => Some(rest)
+    None =>
+      match repository.strip_prefix("http://github.com/") {
+        Some(rest) => Some(rest)
+        None => repository.strip_prefix("git@github.com:")
+      }
+  }
+}
+
+///|
+/// 去掉结尾的 `.git`（`repo.git` → `repo`）。
+fn strip_git_suffix(segment : String) -> String {
+  let n = segment.length()
+  if n > 4 && segment[n - 4:].to_owned() == ".git" {
+    segment[:n - 4].to_owned()
+  } else {
+    segment
+  }
+}
+
+///|
+/// README 的候选 raw 地址，**按尝试顺序**返回。
+///
+/// 为什么要候选列表而不是单个地址：默认分支可能是 `main` 或 `master`，
+/// 文件名可能是 `README.md` 或 `README.mbt.md`（后者是 MoonBit 项目的约定，
+/// 例如 `moon new` 生成的就是它）。逐个尝试，第一个成功即用。
+pub fn readme_url_candidates(owner : String, repo : String) -> Array[String] {
+  let base = "https://raw.githubusercontent.com/" + owner + "/" + repo + "/"
+  [
+    base + "main/README.md",
+    base + "master/README.md",
+    base + "main/README.mbt.md",
+    base + "master/README.mbt.md",
+  ]
+}

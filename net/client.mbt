@@ -37,8 +37,6 @@ pub async fn fetch_search(
 /// 取单个包的详情响应原文。
 ///
 /// 对应 `GET /api-new/v0/modules/<owner>/<name>`。
-/// 此处只负责取回原文，字段解析留给实现 `get_package_api` 的里程碑 ——
-/// 避免在还没有该工具需求时过早抽象出中间结构。
 /// 失败（网络错误或响应非合法 JSON）时返回 `None`。
 pub async fn fetch_module_raw(name : StringView) -> String? {
   try {
@@ -52,4 +50,39 @@ pub async fn fetch_module_raw(name : StringView) -> String? {
   } catch {
     _ => None
   }
+}
+
+///|
+/// 从包仓库取 README 正文。
+///
+/// 为什么需要这一步：mooncakes.io 的 API **不提供** README 正文
+/// （`metadata.readme` 只是文件名），也不提供函数签名。
+/// 而 MoonBit 包的 API 用法恰恰写在 README 里 —— 所以要让 AI 不猜 API，
+/// 就得把 README 交到它手上。
+///
+/// 取的是 GitHub 的 raw 地址（纯文本，不是抓 HTML 页面）。
+/// 逐个尝试 `readme_url_candidates` 给出的地址：
+/// `main` / `master` 两种默认分支 × `README.md` / `README.mbt.md` 两种文件名。
+///
+/// 返回 `None` 表示**没有拿到**（仓库不在 GitHub、地址形式不认识、或都 404）——
+/// 这不是错误，上层会降级成"只给事实、不给 README"。
+pub async fn fetch_readme(repository : StringView) -> String? {
+  let (owner, repo) = match github_owner_repo(repository) {
+    Some(pair) => pair
+    None => return None
+  }
+  for url in readme_url_candidates(owner, repo) {
+    let fetched : String? = try {
+      let (_response, body) = @http.get(url)
+      Some(body.text())
+    } catch {
+      _ => None
+    }
+    match fetched {
+      // 空文件视为没取到，继续尝试下一个候选地址。
+      Some(text) => if text.trim().length() > 0 { return Some(text) }
+      None => ()
+    }
+  }
+  None
 }

@@ -8,11 +8,17 @@ import {
 // Values
 pub async fn fetch_module_raw(StringView) -> String?
 
+pub async fn fetch_readme(StringView) -> String?
+
 pub async fn fetch_search(StringView, Int) -> Array[@mooncakes.PackageHit]?
+
+pub fn github_owner_repo(StringView) -> (String, String)?
 
 pub fn module_url(StringView) -> String
 
 pub fn percent_encode(StringView) -> String
+
+pub fn readme_url_candidates(String, String) -> Array[String]
 
 pub fn search_url(StringView, Int) -> String
 

@@ -141,12 +141,17 @@ async fn execute_get_package_api(id : Json, args : Json?) -> String {
             "'. Check that the package name is in owner/pkg form.",
             is_error=true,
           )
-        Some(detail) =>
+        Some(detail) => {
+          // 再取一次仓库 README：MoonBit 包的 API 用法写在 README 里，
+          // 而 mooncakes.io 的 API 不提供正文。取不到就降级（传 None），
+          // 渲染层会说明"没取到"并给出仓库地址。
+          let readme = @net.fetch_readme(detail.repository)
           @mcp.tool_result(
             id,
-            @mcp.render_package_detail(detail),
+            @mcp.render_package_detail(detail, readme~),
             is_error=false,
           )
+        }
       }
   }
 }

@@ -43,3 +43,59 @@ test "module_url keeps the owner slash" {
     "https://mooncakes.io/api-new/v0/modules/mizchi/parquet",
   )
 }
+
+// ---------------------------------------------------------------- README 地址
+
+///|
+test "github_owner_repo handles the common repository URL forms" {
+  // 这些形式都实测过（raw 地址返回 200）
+  assert_eq(
+    github_owner_repo("https://github.com/mizchi/parquet"),
+    Some(("mizchi", "parquet")),
+  )
+  assert_eq(
+    github_owner_repo("https://github.com/mizchi/parquet/"),
+    Some(("mizchi", "parquet")),
+  )
+  assert_eq(
+    github_owner_repo("https://github.com/mizchi/parquet.git"),
+    Some(("mizchi", "parquet")),
+  )
+  assert_eq(
+    github_owner_repo("git@github.com:mizchi/parquet.git"),
+    Some(("mizchi", "parquet")),
+  )
+}
+
+///|
+test "github_owner_repo ignores extra path segments" {
+  // 例如指向子目录的地址
+  assert_eq(
+    github_owner_repo("https://github.com/mizchi/parquet/tree/main/src"),
+    Some(("mizchi", "parquet")),
+  )
+}
+
+///|
+test "github_owner_repo returns None for unknown hosts or bad input" {
+  // 只认 github.com：其它平台的 raw 规律未经验证，宁可降级也不猜
+  assert_true(github_owner_repo("https://gitlab.com/a/b") is None)
+  assert_true(github_owner_repo("https://github.com/only-owner") is None)
+  assert_true(github_owner_repo("") is None)
+  assert_true(github_owner_repo("mizchi/parquet") is None)
+}
+
+///|
+test "readme_url_candidates covers both branch and filename conventions" {
+  let urls = readme_url_candidates("mizchi", "parquet")
+  assert_eq(urls.length(), 4)
+  // 顺序即尝试顺序：先 main/README.md（最常见），最后才是 README.mbt.md
+  assert_eq(
+    urls[0],
+    "https://raw.githubusercontent.com/mizchi/parquet/main/README.md",
+  )
+  assert_eq(
+    urls[3],
+    "https://raw.githubusercontent.com/mizchi/parquet/master/README.mbt.md",
+  )
+}
