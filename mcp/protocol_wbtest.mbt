@@ -264,3 +264,76 @@ test "render_search_results marks new packages" {
   let text = render_search_results("x", [hit("a/b", is_new=true)])
   assert_true(text.contains("[new]"))
 }
+
+// ---------------------------------------------------------------- 包详情渲染
+
+///|
+/// 测试辅助：构造包详情（取值取自录制的真实响应）。
+fn detail() -> @mooncakes.PackageDetail {
+  {
+    module_name: "mizchi/parquet",
+    version: "0.2.1",
+    latest_version: "0.2.1",
+    license: "Apache-2.0",
+    repository: "https://github.com/mizchi/parquet",
+    description: "Parquet reader/writer for MoonBit.",
+    keywords: ["moonbit", "parquet"],
+    created_at: "2026-04-25T11:15:48.797751",
+    build_status: "success",
+    yanked: false,
+    deps: [("f4ah6o/duckdb", "0.6.0"), ("moonbitlang/x", "0.4.40")],
+    versions: ["0.2.1", "0.2.0", "0.1.0"],
+  }
+}
+
+///|
+test "render_package_detail reports the verifiable facts" {
+  let text = render_package_detail(detail())
+  assert_true(text.contains("mizchi/parquet @ 0.2.1"))
+  assert_true(text.contains("Apache-2.0"))
+  assert_true(text.contains("https://github.com/mizchi/parquet"))
+  assert_true(text.contains("2026-04-25"))
+  assert_true(text.contains("Build status: success"))
+  assert_true(text.contains("moonbitlang/x  0.4.40"))
+  assert_true(text.contains("f4ah6o/duckdb  0.6.0"))
+  assert_true(text.contains("0.2.1, 0.2.0, 0.1.0"))
+}
+
+///|
+test "render_package_detail is honest about the missing API surface" {
+  // 上游不提供函数签名。渲染必须把这一点说出来，并指向真实来源，
+  // 而不是编一份看起来很专业的"API 摘要"—— 这正是本项目的立意。
+  let text = render_package_detail(detail())
+  assert_true(text.contains("exposes no function signatures"))
+  assert_true(text.contains("Read the repository README"))
+}
+
+///|
+test "render_package_detail shows the latest version when it differs" {
+  let older = { ..detail(), version: "0.1.0", }
+  assert_true(render_package_detail(older).contains("(latest: 0.2.1)"))
+}
+
+///|
+test "render_package_detail flags a yanked release" {
+  let yanked = { ..detail(), yanked: true, }
+  assert_true(render_package_detail(yanked).contains("[YANKED]"))
+}
+
+///|
+test "render_package_detail omits empty fields instead of printing blank lines" {
+  let sparse = {
+    ..detail(),
+    description: "",
+    license: "",
+    repository: "",
+    keywords: [],
+  }
+  let text = render_package_detail(sparse)
+  assert_true(!text.contains("Description"))
+  assert_true(!text.contains("License"))
+  assert_true(!text.contains("Keywords"))
+  // 空依赖表要有明确说明，而不是留下一段空白
+  let no_deps = { ..detail(), deps: [], }
+  assert_true(render_package_detail(no_deps).contains("(none)"))
+}

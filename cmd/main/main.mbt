@@ -57,49 +57,108 @@ async fn handle(text : StringView) -> String? {
 /// 这样模型能看到失败原因并自己换个策略，而不是收到一个它无法处理的协议错误。
 async fn execute_tool(id : Json, name : String, args : Json?) -> String {
   match name {
-    "search_packages" => {
-      let intent = match @mcp.arg_string(args, "intent") {
-        Some(s) =>
-          if s.trim().length() == 0 {
-            return @mcp.tool_result(
-              id,
-              "The 'intent' argument must not be empty.",
-              is_error=true,
-            )
-          } else {
-            s
-          }
-        None =>
-          return @mcp.tool_result(
-            id,
-            "Missing required argument: intent",
-            is_error=true,
-          )
-      }
-      let limit = match @mcp.arg_int(args, "limit") {
-        Some(n) => if n <= 0 { 10 } else { n }
-        None => 10
-      }
-      // 关键：区分「上游不可达」与「没有匹配结果」。
-      // 两者对模型的含义完全不同 —— 前者应重试或换用缓存，后者应换关键词。
-      match @net.fetch_search(intent, limit) {
-        None =>
-          @mcp.tool_result(
-            id,
-            "Could not reach mooncakes.io. Check network connectivity, then retry.",
-            is_error=true,
-          )
-        Some(hits) => {
-          let ranked = @rank.rank(hits, intent)
-          @mcp.tool_result(
-            id,
-            @mcp.render_search_results(intent, ranked),
-            is_error=false,
-          )
-        }
-      }
-    }
+    "search_packages" => execute_search_packages(id, args)
+    "get_package_api" => execute_get_package_api(id, args)
     _ =>
       @mcp.tool_result(id, "Tool not implemented yet: " + name, is_error=true)
   }
+}
+
+///|
+/// `search_packages`：按意图检索生态包。
+async fn execute_search_packages(id : Json, args : Json?) -> String {
+  let intent = match @mcp.arg_string(args, "intent") {
+    Some(s) =>
+      if s.trim().length() == 0 {
+        return @mcp.tool_result(
+          id,
+          "The 'intent' argument must not be empty.",
+          is_error=true,
+        )
+      } else {
+        s
+      }
+    None =>
+      return @mcp.tool_result(
+        id,
+        "Missing required argument: intent",
+        is_error=true,
+      )
+  }
+  let limit = match @mcp.arg_int(args, "limit") {
+    Some(n) => if n <= 0 { 10 } else { n }
+    None => 10
+  }
+  // 关键：区分「上游不可达」与「没有匹配结果」。
+  // 两者对模型的含义完全不同 —— 前者应重试或换用缓存，后者应换关键词。
+  match @net.fetch_search(intent, limit) {
+    None => @mcp.tool_result(id, upstream_unreachable, is_error=true)
+    Some(hits) => {
+      let ranked = @rank.rank(hits, intent)
+      @mcp.tool_result(
+        id,
+        @mcp.render_search_results(intent, ranked),
+        is_error=false,
+      )
+    }
+  }
+}
+
+///|
+/// `get_package_api`：取单个包的真实事实（依赖表、版本历史、构建状态等）。
+///
+/// 注意工具名里的 "api" 是历史命名。**上游并不提供函数签名**，
+/// 因此本工具不会编造 API 摘要，而是如实给出能核实的信息，
+/// 并指向仓库 README 让模型去读权威来源。
+async fn execute_get_package_api(id : Json, args : Json?) -> String {
+  let name = match @mcp.arg_string(args, "name") {
+    Some(s) =>
+      if s.trim().length() == 0 {
+        return @mcp.tool_result(
+          id,
+          "The 'name' argument must not be empty.",
+          is_error=true,
+        )
+      } else {
+        s
+      }
+    None =>
+      return @mcp.tool_result(
+        id,
+        "Missing required argument: name (expected owner/pkg, for example mizchi/parquet)",
+        is_error=true,
+      )
+  }
+  match @net.fetch_module_raw(name) {
+    None => @mcp.tool_result(id, upstream_unreachable_for(name), is_error=true)
+    Some(raw) =>
+      match @mooncakes.decode_module(raw) {
+        None =>
+          @mcp.tool_result(
+            id,
+            "Unexpected response from mooncakes.io for '" +
+            name +
+            "'. Check that the package name is in owner/pkg form.",
+            is_error=true,
+          )
+        Some(detail) =>
+          @mcp.tool_result(
+            id,
+            @mcp.render_package_detail(detail),
+            is_error=false,
+          )
+      }
+  }
+}
+
+///|
+/// 上游不可达时的统一提示 —— 对模型最重要的是"这是网络问题，可以重试"。
+let upstream_unreachable : String = "Could not reach mooncakes.io. Check network connectivity, then retry."
+
+///|
+/// 针对某个包名定制的不可达提示。
+fn upstream_unreachable_for(name : String) -> String {
+  "Could not reach mooncakes.io for '" +
+  name +
+  "'. Check network connectivity, then retry."
 }

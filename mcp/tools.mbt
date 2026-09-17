@@ -31,13 +31,13 @@ pub let tools_list_result : String = "{\"tools\":[" +
   "\"description\":\"Search MoonBit ecosystem packages on mooncakes.io by intent. Call this before writing code that may already exist as a package. Returns package name, version, license, download count and publish date, ranked by name/keyword/description match plus download count.\"," +
   "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"intent\":{\"type\":\"string\",\"description\":\"Natural-language description of what you want to do\"},\"limit\":{\"type\":\"integer\",\"description\":\"Maximum number of results, default 10\"}},\"required\":[\"intent\"]}}," +
   "{\"name\":\"get_package_api\"," +
-  "\"description\":\"Get the real API surface of a MoonBit package: its dependency table and README highlights, read straight from mooncakes.io. Use this to avoid inventing function names.\"," +
+  "\"description\":\"Get verifiable facts about a MoonBit package: its dependency table, version history, license, build status and repository, read straight from mooncakes.io. Note that mooncakes.io exposes no function signatures, so read the repository README for the API surface; this tool will not guess it.\"," +
   "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\",\"description\":\"Package name in owner/pkg form, for example mizchi/parquet\"},\"version\":{\"type\":\"string\",\"description\":\"Package version; defaults to the latest\"}},\"required\":[\"name\"]}}," +
   "{\"name\":\"suggest_dependencies\"," +
   "\"description\":\"Given a requirement in natural language, return which MoonBit packages to use, with alternatives compared by download count, license and publish date.\"," +
   "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"requirement\":{\"type\":\"string\",\"description\":\"What you want to build, in natural language\"}},\"required\":[\"requirement\"]}}," +
   "{\"name\":\"pack_project_context\"," +
-  "\"description\":\"Pack the relevant parts of a MoonBit project into a token budget, ranked by import relevance, and inject the real API summaries of the packages the project uses.\"," +
+  "\"description\":\"Pack the relevant parts of a MoonBit project into a token budget, ranked by import relevance, and attach the verifiable dependency and version facts of the packages the project uses.\"," +
   "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\",\"description\":\"Path to the MoonBit project root\"},\"budget\":{\"type\":\"integer\",\"description\":\"Token budget for the packed context\"}},\"required\":[\"path\",\"budget\"]}}" +
   "]}"
 

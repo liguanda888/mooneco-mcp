@@ -11,6 +11,8 @@ pub fn arg_int(Json?, String) -> Int?
 
 pub fn arg_string(Json?, String) -> String?
 
+pub fn date_part(String) -> String
+
 pub fn dispatch(StringView) -> Outcome
 
 pub fn error_response(Json, Int, String) -> String
@@ -28,6 +30,8 @@ pub let parse_error_code : Int
 pub fn parse_request(StringView) -> RpcRequest?
 
 pub let protocol_version : String
+
+pub fn render_package_detail(@mooncakes.PackageDetail) -> String
 
 pub fn render_search_results(StringView, Array[@mooncakes.PackageHit]) -> String
 

@@ -15,3 +15,32 @@ pub(all) struct PackageHit {
   created_at : String
   is_new : Bool
 } derive(Debug, Eq)
+
+///|
+/// 单个包的详情，对应 `GET /api-new/v0/modules/<owner>/<name>`。
+///
+/// **重要事实（已实测，决定了本结构只能有这些字段）：**
+/// - 上游的 `metadata.readme` **只是文件名**（例如 `"README.md"`），不是正文；
+/// - 没有公开的「函数签名 / API 列表」端点 —— 逐个探测候选端点全部 404。
+///
+/// 所以本结构如实反映**能拿到**的信息：依赖表、版本历史、构建状态、
+/// 许可证、仓库地址等。要读 API 只能去仓库 README —— 这一点由渲染层
+/// 明确告知模型，而不是编造一份"API 摘要"。
+pub(all) struct PackageDetail {
+  /// 包标识（`owner/pkg`）。字段名用 `module_name` 而非 `module` ——
+  /// `module` 是 MoonBit 的保留字。
+  module_name : String
+  version : String
+  latest_version : String
+  license : String
+  repository : String
+  description : String
+  keywords : Array[String]
+  created_at : String
+  build_status : String
+  yanked : Bool
+  /// 依赖表，已按包名排序以保证输出稳定。
+  deps : Array[(String, String)]
+  /// 版本历史，保持上游顺序（通常新的在前）。
+  versions : Array[String]
+} derive(Debug, Eq)

@@ -87,7 +87,90 @@ pub fn render_search_results(
     index = index + 1
   }
   buf.write_string(
-    "\nUse get_package_api to read the real API surface of one of these before writing code.",
+    "\nUse get_package_api to see its dependency table, version history and repository before writing code.",
   )
   buf.to_string()
+}
+
+///|
+/// 把包详情渲染成给模型读的文本。
+///
+/// **必须如实说明能力边界**：mooncakes.io 的公开 API 不提供函数签名，
+/// 也不提供 README 正文（`metadata.readme` 只是文件名）。
+/// 所以这里报告能拿到的事实，并明确指向仓库 README —— 而不是编一份
+/// 看起来很专业的"API 摘要"。让模型去读真实来源，比给它编的摘要安全。
+pub fn render_package_detail(detail : @mooncakes.PackageDetail) -> String {
+  let buf = StringBuilder::StringBuilder()
+  buf.write_string(detail.module_name)
+  buf.write_string(" @ ")
+  buf.write_string(detail.version)
+  if detail.latest_version != "" && detail.latest_version != detail.version {
+    buf.write_string("   (latest: ")
+    buf.write_string(detail.latest_version)
+    buf.write_string(")")
+  }
+  if detail.yanked {
+    buf.write_string("   [YANKED]")
+  }
+  buf.write_string("\n")
+  write_field(buf, "Description", detail.description)
+  write_field(buf, "License", detail.license)
+  write_field(buf, "Repository", detail.repository)
+  if detail.keywords.length() > 0 {
+    write_field(buf, "Keywords", detail.keywords.join(", "))
+  }
+  write_field(buf, "Published", date_part(detail.created_at))
+  write_field(buf, "Build status", detail.build_status)
+  buf.write_string("\nDependencies (")
+  buf.write_string(detail.deps.length().to_string())
+  buf.write_string("):\n")
+  if detail.deps.length() == 0 {
+    buf.write_string("  (none)\n")
+  } else {
+    for dep in detail.deps {
+      buf.write_string("  ")
+      buf.write_string(dep.0)
+      buf.write_string("  ")
+      buf.write_string(dep.1)
+      buf.write_string("\n")
+    }
+  }
+  buf.write_string("\nVersion history (")
+  buf.write_string(detail.versions.length().to_string())
+  buf.write_string(", newest first):\n  ")
+  buf.write_string(detail.versions.join(", "))
+  buf.write_string("\n")
+  buf.write_string(
+    "\nNote: the mooncakes.io API exposes no function signatures, so this tool cannot list the API surface. Read the repository README for that",
+  )
+  if detail.repository != "" {
+    buf.write_string(": ")
+    buf.write_string(detail.repository)
+  } else {
+    buf.write_string(".")
+  }
+  buf.to_string()
+}
+
+///|
+/// 写一行 `名称 : 值`；值为空则整行省略，避免输出里出现无意义的空字段。
+fn write_field(buf : StringBuilder, label : String, value : String) -> Unit {
+  if value != "" {
+    buf.write_string("  ")
+    buf.write_string(label)
+    buf.write_string(": ")
+    buf.write_string(value)
+    buf.write_string("\n")
+  }
+}
+
+///|
+/// 只取 ISO 时间的日期部分（`2026-04-25T11:15:48` → `2026-04-25`）。
+/// 不足 10 个字符时原样返回。
+pub fn date_part(stamp : String) -> String {
+  if stamp.length() >= 10 {
+    stamp[:10].to_owned()
+  } else {
+    stamp
+  }
 }

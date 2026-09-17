@@ -1,15 +1,17 @@
 // cmd/main —— MCP Server 可执行入口（STDIO 传输 + 工具执行）
 //
 // 分工：
-// - `mcp/`   协议决定（纯逻辑，可测）
-// - `net/`   HTTPS 传输
-// - `rank/`  相关性排序
-// - 这里    读一行 → 分发 → 必要时执行工具 → 写一行
+// - `mcp/`        协议决定与渲染（纯逻辑，可测）
+// - `mooncakes/`  JSON 解析（纯逻辑，可测）
+// - `net/`        HTTPS 传输
+// - `rank/`       相关性排序
+// - 这里          读一行 → 分发 → 必要时执行工具 → 写一行
 //
 // 因为用到异步 STDIO 与网络，本包限定为 native。
 
 import {
   "liguanda888/mooneco/mcp",
+  "liguanda888/mooneco/mooncakes",
   "liguanda888/mooneco/net",
   "liguanda888/mooneco/rank",
   "moonbitlang/async",

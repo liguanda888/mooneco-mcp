@@ -16,8 +16,8 @@ MoonEco MCP 让 AI 在动手写代码之前，先查到**真实的包、真实�
 | 特色 | 说明 |
 |---|---|
 | 🔍 **内置生态索引** | 覆盖 mooncakes.io 全量包，按**意图**检索，融合名称、关键词、描述匹配度与下载量加权排序，并标记新包（`is_new`） |
-| 🚫 **零幻觉 API** | 所有 API 名称与依赖关系都来自 mooncakes.io 的真实返回，**不依赖模型记忆** |
-| 🧠 **MoonBit 语义级上下文** | 打包项目上下文时，会把项目**实际用到的包的 API 摘要与依赖关系一并注入** —— 因为工具理解 MoonBit 的包结构，而不是单纯按文件切分 |
+| 🚫 **零幻觉** | 包名、版本与依赖关系全部来自 mooncakes.io 的真实返回，**不依赖模型记忆**。上游不提供函数签名时，工具会**明说这一点并指向仓库 README**，而不是编一份看起来专业的"API 摘要" |
+| 🧠 **MoonBit 语义级上下文** | 打包项目上下文时，会把项目**实际用到的包的依赖与版本事实一并附上** —— 因为工具理解 MoonBit 的包结构，而不是单纯按文件切分 |
 | 🔌 **离线可复现** | 本地快照缓存 + TTL；测试基于录制的 JSON fixture，不依赖实时网络，评审可独立复跑 |
 | 🧩 **纯 MoonBit 实现** | 无 FFI，全项目 MoonBit，多后端可用 |
 
@@ -28,7 +28,7 @@ MoonEco MCP 让 AI 在动手写代码之前，先查到**真实的包、真实�
 | 痛点 | 表现 | MoonEco 的答案 |
 |---|---|---|
 | AI 不知道生态里有什么 | 幻觉 API、手写已有轮子 | `search_packages` / `suggest_dependencies` |
-| AI 不知道某个包怎么用 | 猜函数签名、猜参数 | `get_package_api` |
+| AI 不知道某个包怎么用 | 猜函数签名、猜参数 | `get_package_api`（给真实依赖与版本，并指向仓库 README） |
 | 上下文又贵又乱 | 整个仓库塞进去，超预算且低信噪比 | `pack_project_context` |
 
 ---
@@ -38,9 +38,9 @@ MoonEco MCP 让 AI 在动手写代码之前，先查到**真实的包、真实�
 | 工具 | 说明 |
 |---|---|
 | `search_packages` | 按意图检索生态包，带下载量、许可证与发布时间 |
-| `get_package_api` | 返回指定包的 API 摘要、依赖表与 README 要点 |
+| `get_package_api` | 返回指定包**可核实的事实**：依赖表、版本历史、许可证、构建状态、仓库地址 |
 | `suggest_dependencies` | 「我要做 X」→ 反查该用哪些包，并给出替代方案对比 |
-| `pack_project_context` | 把项目压缩进 token 预算；**同时注入所用包的 API 摘要**，让上下文自带生态知识 |
+| `pack_project_context` | 把项目压缩进 token 预算；**同时附上所用包的依赖与版本事实**，让上下文自带生态知识 |
 
 工具的 `description` 与 `inputSchema` 均使用**英文** —— 它们由 AI 模型消费，英文的模型兼容性与调用准确率更好。
 
@@ -57,10 +57,10 @@ AI 会自动：
 1. 调用 `suggest_dependencies("解析 Parquet 并写入 SQLite")`
    → `mizchi/parquet@0.2.1`、`Lfan-ke/moon-sqlite@0.2.2`（含许可证与下载量）
 2. 调用 `get_package_api("mizchi/parquet", "0.2.1")`
-   → 真实 API 摘要与依赖表，不再靠猜
+   → 真实依赖表与版本历史；工具会说明上游不提供函数签名，并给出仓库地址
 3. 调用 `pack_project_context("./myproject", 32000)`
-   → 压进 32k token 预算，并附带这些包的真实 API 摘要
-4. 基于**真实存在**的包与 API 写代码
+   → 压进 32k token 预算，并附上这些包的真实依赖与版本事实
+4. 基于**真实存在**的包写代码，API 细节去仓库 README 核对
 
 ---
 
@@ -119,12 +119,12 @@ the source and license will be stated here and in the file header.
 | 阶段 | 内容 | 状态 |
 |---|---|---|
 | M0 | 仓库骨架、`moon.mod`、构建与测试跑通、CI | ✅ |
-| M1 | mooncakes API 客户端 + 本地快照缓存 + fixture 测试 | 🚧 |
-| M2 | MCP Server 骨架（`initialize` / `tools/list` / `tools/call`）+ `search_packages` | ⬜ |
-| M3 | `get_package_api` + `suggest_dependencies` | ⬜ |
-| M4 | `pack_project_context`（import 相关性 + 包 API 注入） | ⬜ |
-| M5 | 端到端测试 + 在 MCP 客户端实测接入 | ⬜ |
-| M6 | 文档、可复现演示说明、演示录屏 | ⬜ |
+| M1 | mooncakes API 客户端 + fixture 测试 | ✅ |
+| M2 | MCP 协议层 + STDIO 传输 + `search_packages` | ✅ |
+| M3 | `get_package_api` ✅ ／ `suggest_dependencies` | 🚧 |
+| M4 | `pack_project_context`（import 相关性 + 包事实注入） | ⬜ |
+| M5 | 本地快照缓存（TTL，断网兜底） | ⬜ |
+| M6 | 演示录屏 + 验收材料 | ⬜ |
 
 **9/24 验收线**：四个工具可用、测试通过、README 可让评审独立跑起来、附演示录屏。
 

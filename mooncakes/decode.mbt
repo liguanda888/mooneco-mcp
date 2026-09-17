@@ -80,3 +80,111 @@ fn field_string_array(obj : Map[String, Json], key : String) -> Array[String] {
     _ => []
   }
 }
+
+///|
+/// 解析**包详情**响应（`GET /api-new/v0/modules/<owner>/<name>`）。
+///
+/// 已实测的上游事实决定了这个函数能给出的东西：
+/// - `metadata.readme` 只是**文件名**（`"README.md"`），不是正文；
+/// - 不存在公开的函数签名 / API 列表端点（候选端点逐个探测全部 404）。
+///
+/// 所以这里如实解析能拿到的：依赖表、版本历史、构建状态、许可证、仓库地址。
+/// `module` 是必有的标识字段；缺失它说明拿到的不是详情响应（例如错误页），
+/// 这时返回 `None` 而不是一个各字段为空的结构。
+pub fn decode_module(json_text : StringView) -> PackageDetail? {
+  let root = @json.parse(json_text) catch { _ => return None }
+  guard root is Object(obj) else { return None }
+  let module_name = field_string(obj, "module")
+  if module_name == "" {
+    return None
+  }
+  Some({
+    module_name,
+    version: field_string(obj, "version"),
+    latest_version: field_string(obj, "latest_version"),
+    build_status: field_string(obj, "build_status"),
+    yanked: field_bool(obj, "yanked"),
+    license: metadata_string(obj, "license"),
+    repository: metadata_string(obj, "repository"),
+    description: metadata_string(obj, "description"),
+    created_at: metadata_string(obj, "created_at"),
+    keywords: metadata_string_array(obj, "keywords"),
+    deps: metadata_deps(obj),
+    versions: metadata_versions(obj),
+  })
+}
+
+///|
+/// 取 `metadata` 子对象。
+fn metadata_object(obj : Map[String, Json]) -> Map[String, Json]? {
+  match obj.get("metadata") {
+    Some(Object(m)) => Some(m)
+    _ => None
+  }
+}
+
+///|
+/// 从 `metadata` 下取字符串字段。
+fn metadata_string(obj : Map[String, Json], key : String) -> String {
+  match metadata_object(obj) {
+    Some(m) => field_string(m, key)
+    None => ""
+  }
+}
+
+///|
+/// 从 `metadata` 下取字符串数组字段。
+fn metadata_string_array(
+  obj : Map[String, Json],
+  key : String,
+) -> Array[String] {
+  match metadata_object(obj) {
+    Some(m) => field_string_array(m, key)
+    None => []
+  }
+}
+
+///|
+/// 取 `metadata.deps` 依赖表。
+///
+/// 上游是「对象」形式（`{"moonbitlang/x":"0.4.40", ...}`），而对象的键序
+/// 不保证稳定 —— 因此转成数组后**按包名排序**，让输出与测试都可复现。
+fn metadata_deps(obj : Map[String, Json]) -> Array[(String, String)] {
+  let pairs : Array[(String, String)] = match metadata_object(obj) {
+    Some(m) =>
+      match m.get("deps") {
+        Some(Object(d)) =>
+          d
+          .to_array()
+          .map(fn(pair) {
+            let version = match pair.1 {
+              String(v) => v
+              _ => ""
+            }
+            (pair.0, version)
+          })
+        _ => []
+      }
+    None => []
+  }
+  pairs.sort_by(fn(a, b) { a.0.compare(b.0) })
+  pairs
+}
+
+///|
+/// 取 `versions` 版本历史（保持上游顺序，通常是新版本在前）。
+/// 没有版本号的条目被丢弃。
+fn metadata_versions(obj : Map[String, Json]) -> Array[String] {
+  match obj.get("versions") {
+    Some(Array(items)) =>
+      items
+      .map(fn(item) {
+        match item {
+          Object(m) => field_string(m, "version")
+          _ => ""
+        }
+      })
+      .filter(fn(v) { v != "" })
+    _ => []
+  }
+}

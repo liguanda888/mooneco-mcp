@@ -117,9 +117,23 @@ npx @modelcontextprotocol/inspector _build/native/debug/build/cmd/main/main
 | 相关性打分与稳定排序 | ✅ 已实现并测试 |
 | HTTPS 客户端（原生，无 FFI） | ✅ 已实现 |
 | **`tools/call` → `search_packages`** | ✅ **已实现，联网检索真实生效** |
-| `tools/call` → 其余三个工具 | 🚧 返回可解释的"尚未实现"错误 |
+| **`tools/call` → `get_package_api`** | ✅ **已实现，返回依赖表 / 版本历史 / 构建状态** |
+| `tools/call` → `suggest_dependencies` / `pack_project_context` | 🚧 返回可解释的"尚未实现"错误 |
 | 本地快照缓存 | 🚧 计划中 |
-| `pack_project_context` | 🚧 计划中 |
+
+### 关于 `get_package_api` 的能力边界（重要且如实）
+
+mooncakes.io 的公开 API **不提供函数签名**，也不提供 README 正文
+（`metadata.readme` 只是文件名 `"README.md"`）。逐个探测候选的
+symbols / docs 端点也全部返回 404。
+
+因此本工具**不编造 API 摘要**，而是：
+
+1. 给出能核实的事实——依赖表、版本历史、许可证、构建状态、仓库地址；
+2. 明确告诉模型"上游没有函数签名"，并给出仓库地址让它去读权威来源。
+
+> 这比给一份看起来专业的编造摘要安全得多：模型会去读真实来源，
+> 而不是相信一个可能过期或虚构的接口描述。
 
 `search_packages` 的真实输出（可直接复跑）：
 
