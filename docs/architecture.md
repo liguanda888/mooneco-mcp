@@ -2,7 +2,7 @@
 
 > 面向读者的说明文档。目标不是罗列代码，而是讲清**每个设计决定背后的理由**。
 >
-> 规模参考：自主实现约 **670 行** + 测试约 **500 行**（**48 个测试**），分布在 5 个包里。
+> 规模参考：自主实现约 **1386 行**（更保守口径 909 行）+ 测试 **742 行**（**74 个测试**），分布在 5 个包里。
 > 依赖：`moonbitlang/async`（官方异步库，零依赖）。
 
 ---
@@ -70,7 +70,7 @@ mindmap
         纯 MoonBit 无 FFI
         原生可执行文件
       可复现
-        48 个测试不触网
+        74 个测试不触网
         CI 自动验证协议
 ```
 
@@ -100,7 +100,7 @@ MoonEco MCP
     │   ├── 纯 MoonBit，无 FFI
     │   └── 原生可执行文件
     └── 可复现
-        ├── 48 个测试全部不触网
+        ├── 74 个测试全部不触网
         └── CI 自动验证协议行为
 ```
 
@@ -197,7 +197,7 @@ pub(all) enum Outcome {
 **为什么要把"需要联网"这件事做成返回值？**
 
 因为如果 `dispatch` 自己去联网，那么"协议是否正确"就只能**启动一个进程、连上网络**才能验证。
-而现在，48 个测试里有 20 个直接测协议行为——**不开进程、不连网络、毫秒级跑完**。
+而现在，74 个测试里有 33 个直接测协议行为——**不开进程、不连网络、毫秒级跑完**。
 
 评审断网也能复跑，这不是巧合，是分层换来的。
 
@@ -309,7 +309,7 @@ AI 客户端收到结果
 | `endpoint.mbt` | 拼 URL + 百分号编码（**纯函数，可测**） |
 | `client.mbt` | 发 HTTPS 请求（async，native） |
 
-**两个值得一提的决定：**
+**三个值得一提的决定：**
 
 **① URL 拼接被拆成纯函数，是为了能测。**
 `search_url("http server", 5)` 会产生 `?kw=http%20server&limit=5`——空格必须编码成 `%20`。
@@ -333,6 +333,20 @@ pub async fn fetch_search(keyword, limit) -> Array[@mooncakes.PackageHit]?
 
 如果合并成空数组，AI 会以为"MoonBit 生态里没有 Parquet 库"——
 于是**放弃一个其实存在的方案**。这个 bug 不会报错，只会让 AI 悄悄做出错误的决定。
+
+**③ README 抓取必须多源 + 超时，因为「取不到」和「挂住」是两回事。**
+
+mooncakes.io 不提供 README 正文（`metadata.readme` 只是文件名），
+而 MoonBit 包的 API 用法恰好写在 README 里 —— 所以要自己去仓库取。麻烦在于：
+
+| 现象 | 后果 | 对策 |
+|---|---|---|
+| `raw.githubusercontent.com` 在国内的失败方式**不是 404**，而是 TCP 连接被丢弃、长时间无响应 | 没有超时的话，一次工具调用会**永久挂住** —— 调用方连降级的机会都没有 | 每次尝试 8 秒超时 |
+| 单一数据源在不同网络下可用性不同 | 换一个网络环境工具就废了 | 按 `api.github.com` → jsDelivr → raw 的顺序逐个尝试 |
+| jsDelivr 冷缓存时会先回一个 **301**，而 HTTP 客户端不跟随跳转 | 跳转页会被当成 README —— 比取不到更糟 | **只接受 2xx**，其余一律换下一个源 |
+
+这三条是实测出来的，不是设计推演：同一台机器上 curl 访问 raw 连续 19.5 秒无响应，
+而 MoonBit 客户端又能拿到 200。**不稳定本身就是需要被设计应对的事实。**
 
 ### `rank/` —— 相关性打分与排序
 
@@ -426,14 +440,14 @@ score(包="mizchi/parquet", 查询="sqlite") = 50   ← 应该 0！
 pub let fixture_search_parquet : String = "[{\"name\":\"mizchi/parquet\",...}]"
 ```
 
-于是 48 个测试的构成是：
+于是 74 个测试的构成是：
 
 | 包 | 测什么 | 测试数 |
 |---|---|---|
-| `mooncakes/` | JSON 解析（用录制的 fixture） | 8 |
-| `net/` | URL 构造与百分号编码 | 6 |
+| `mooncakes/` | JSON 解析（用录制的 fixture） | 16 |
+| `net/` | URL 构造、百分号编码、README 多源候选顺序 | 11 |
 | `rank/` | 打分规则、排序稳定性 | 12 |
-| `mcp/` | 协议行为、工具目录、渲染 | 20 |
+| `mcp/` | 协议行为、工具目录、渲染 | 33 |
 | 根包 | 版本一致性 | 2 |
 
 **全部不触网。** 只有真实调用工具时才需要网络，而那属于"演示"，不属于"测试"。
@@ -470,7 +484,7 @@ mooncakes/                    ← 先看这个，最容易懂
   types.mbt                   PackageHit 结构定义
   decode.mbt                  JSON 解析（宽容策略）
   fixtures.mbt                录制的真实 API 响应
-  decode_wbtest.mbt           8 个测试
+  decode_wbtest.mbt           16 个测试
 
 rank/                         ← 再看这个，纯逻辑
   score.mbt                   打分规则 + 排序 + 小写化 + 包名段提取
@@ -479,14 +493,14 @@ rank/                         ← 再看这个，纯逻辑
 net/                          ← 然后看这个
   endpoint.mbt                URL 构造 + 百分号编码（纯）
   client.mbt                  HTTPS 请求（async）
-  endpoint_wbtest.mbt         6 个测试
+  endpoint_wbtest.mbt         11 个测试
 
 mcp/                          ← 协议层，核心
   jsonrpc.mbt                 消息解析与构造
   server.mbt                  dispatch + Outcome 枚举
   tools.mbt                   四个工具的英文目录
   render.mbt                  结果渲染
-  protocol_wbtest.mbt         20 个测试
+  protocol_wbtest.mbt         33 个测试
 
 cmd/main/
   main.mbt                    STDIO 事件循环 + 工具执行
