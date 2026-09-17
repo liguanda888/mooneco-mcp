@@ -28,7 +28,7 @@ MoonEco MCP 让 AI 在动手写代码之前，先查到**真实的包、真实�
 | 痛点 | 表现 | MoonEco 的答案 |
 |---|---|---|
 | AI 不知道生态里有什么 | 幻觉 API、手写已有轮子 | `search_packages` / `suggest_dependencies` |
-| AI 不知道某个包怎么用 | 猜函数签名、猜参数 | `get_package_api`（给真实依赖与版本，并指向仓库 README） |
+| AI 不知道某个包怎么用 | 猜函数签名、猜参数 | `get_package_api`（给真实依赖与版本，并把仓库 README 取回来） |
 | 上下文又贵又乱 | 整个仓库塞进去，超预算且低信噪比 | `pack_project_context` |
 
 ---
@@ -57,10 +57,11 @@ AI 会自动：
 1. 调用 `suggest_dependencies("解析 Parquet 并写入 SQLite")`
    → `mizchi/parquet@0.2.1`、`Lfan-ke/moon-sqlite@0.2.2`（含许可证与下载量）
 2. 调用 `get_package_api("mizchi/parquet", "0.2.1")`
-   → 真实依赖表与版本历史；工具会说明上游不提供函数签名，并给出仓库地址
+   → 真实依赖表与版本历史；上游不提供函数签名，因此工具**把仓库 README 取回来**
+   （章节导航 + 正文截断），取不到时明确说明取不到
 3. 调用 `pack_project_context("./myproject", 32000)`
    → 压进 32k token 预算，并附上这些包的真实依赖与版本事实
-4. 基于**真实存在**的包写代码，API 细节去仓库 README 核对
+4. 基于**真实存在**的包和**真实读到的**文档写代码
 
 ---
 
@@ -103,14 +104,23 @@ listed below (required by the contest's open-source compliance criterion).
 
 | Package | Version | License | Purpose |
 |---|---|---|---|
-| [`marianoguerra/mcp`](https://mooncakes.io/docs/marianoguerra/mcp) | TBD | TBD | MCP protocol types + JSON-RPC codec, **planned** |
+| [`moonbitlang/async`](https://mooncakes.io/docs/moonbitlang/async) | 0.22.1 | Apache-2.0 | async runtime, HTTPS client and STDIO transport (native backend) |
+| [`moonbitlang/core`](https://mooncakes.io/docs/moonbitlang/core) | bundled with the toolchain | Apache-2.0 | JSON parsing, base64 and UTF-8 decoding |
 
-**Data source attribution:** ecosystem metadata is retrieved from
-[mooncakes.io](https://mooncakes.io) public JSON API. This project is not
-affiliated with mooncakes.io.
+**Everything else is written in this repository.** In particular the MCP
+protocol layer — JSON-RPC 2.0 framing, tool catalogue, method dispatch — is
+implemented from scratch in `mcp/`, which imports nothing but this project and
+`moonbitlang/core/json`. There is no third-party MCP SDK involved.
+
+**Data sources:** ecosystem metadata comes from the
+[mooncakes.io](https://mooncakes.io) public JSON API; package README text comes
+from the package's own GitHub repository via `api.github.com`, the jsDelivr
+mirror, or `raw.githubusercontent.com` (tried in that order). This project is not
+affiliated with mooncakes.io, GitHub or jsDelivr.
 
 **Ports / references:** if any code is ported or adapted from another project,
-the source and license will be stated here and in the file header.
+the source and license will be stated here and in the file header. No code has
+been ported so far.
 
 ---
 

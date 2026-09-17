@@ -38,9 +38,9 @@ MoonEco MCP lets an agent look up the **real packages and the real APIs** before
 | Tool | Description |
 |---|---|
 | `search_packages` | Search packages by intent, with download counts, licenses and maintenance activity |
-| `get_package_api` | API summary, dependency table and README highlights for a package |
+| `get_package_api` | Verified facts (dependency table, version history, build status, license) **plus the package's own README** — section outline and truncated body |
 | `suggest_dependencies` | "I want to build X" → which packages to use, with alternatives compared |
-| `pack_project_context` | Compress a project into a token budget, **injecting the API summaries of the packages it uses** |
+| `pack_project_context` | Compress a project into a token budget, **injecting the dependency and version facts of the packages it uses** |
 
 Tool `description` and `inputSchema` fields are written in **English** for best
 model compatibility and tool-calling accuracy.
@@ -58,10 +58,12 @@ The agent will:
 1. `suggest_dependencies("parse parquet and write to sqlite")`
    → `mizchi/parquet@0.2.1`, `Lfan-ke/moon-sqlite@0.2.2` (with licenses and download counts)
 2. `get_package_api("mizchi/parquet", "0.2.1")`
-   → real API surface and dependency table, no guessing
+   → real dependency table and version history; since the upstream API exposes no
+   function signatures, the tool **fetches the repository README** (section outline
+   plus a truncated body) and says so plainly when it cannot
 3. `pack_project_context("./myproject", 32000)`
-   → fits 32k tokens, with the real API summaries of those packages attached
-4. Write code against packages that **actually exist**.
+   → fits 32k tokens, with the real dependency and version facts of those packages attached
+4. Write code against packages that **actually exist**, using documentation that was **actually read**.
 
 ---
 
