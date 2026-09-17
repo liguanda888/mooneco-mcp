@@ -86,16 +86,33 @@ test "github_owner_repo returns None for unknown hosts or bad input" {
 }
 
 ///|
-test "readme_url_candidates covers both branch and filename conventions" {
+test "readme_url_candidates puts the reachable mirror before raw" {
   let urls = readme_url_candidates("mizchi", "parquet")
-  assert_eq(urls.length(), 4)
-  // 顺序即尝试顺序：先 main/README.md（最常见），最后才是 README.mbt.md
+  assert_eq(urls.length(), 5)
+  // 顺序即尝试顺序：jsDelivr 优先（中国大陆可直连），raw 殿后。
+  // 实测 raw.githubusercontent.com 在国内是 TCP 连接被丢弃，不是 404。
   assert_eq(
     urls[0],
-    "https://raw.githubusercontent.com/mizchi/parquet/main/README.md",
+    "https://cdn.jsdelivr.net/gh/mizchi/parquet@main/README.mbt.md",
+  )
+  assert_eq(
+    urls[2],
+    "https://cdn.jsdelivr.net/gh/mizchi/parquet@master/README.md",
   )
   assert_eq(
     urls[3],
-    "https://raw.githubusercontent.com/mizchi/parquet/master/README.mbt.md",
+    "https://raw.githubusercontent.com/mizchi/parquet/main/README.md",
+  )
+  assert_eq(
+    urls[4],
+    "https://raw.githubusercontent.com/mizchi/parquet/master/README.md",
+  )
+}
+
+///|
+test "github_readme_api_url points at the official readme endpoint" {
+  assert_eq(
+    github_readme_api_url("mizchi", "parquet"),
+    "https://api.github.com/repos/mizchi/parquet/readme",
   )
 }

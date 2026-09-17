@@ -1,4 +1,4 @@
-// net —— mooncakes.io 的 HTTPS 传输层
+// net —— mooncakes.io 与 GitHub 的 HTTPS 传输层
 //
 // 刻意与 `mooncakes/` 分开：解析逻辑是纯函数、可在任意后端测试；
 // 网络与平台相关的部分集中在这里，并因此限定为 native。
@@ -6,7 +6,10 @@
 
 import {
   "liguanda888/mooneco/mooncakes",
+  "moonbitlang/async",
   "moonbitlang/async/http",
+  "moonbitlang/core/encoding/base64",
+  "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/json",
 }
 

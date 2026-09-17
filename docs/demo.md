@@ -35,10 +35,14 @@ moon build --target native
 sh scripts/smoke.sh
 ```
 
+> Windows 上没有 `sh`：用 Git Bash 执行第 3 步，或直接运行
+> `"C:\Program Files\Git\bin\bash.exe" scripts/smoke.sh`。
+> 前两步在 PowerShell 里可以直接跑。
+
 **第 2 步的预期输出**（数字会随开发推进增长）：
 
 ```
-Total tests: 41, passed: 41, failed: 0.
+Total tests: 74, passed: 74, failed: 0.
 ```
 
 **第 3 步的预期输出**：
@@ -55,14 +59,31 @@ MCP 冒烟测试：_build/native/debug/build/cmd/main/main
 全部通过
 ```
 
+（脚本会自己找 `main` 或 `main.exe`，所以这一行显示的路径随平台而变。）
+
 ---
 
 ## 手动验证协议（不依赖脚本）
 
 服务器用 **MCP 的 STDIO 传输**：换行分隔的 JSON，一问一答。
 
+> **Windows 用户注意**：PowerShell 往原生程序的 stdin 传字符串时会改动引号和编码，
+> 直接 `'...' | main.exe` 会得到 `-32700 Parse error`。用下面的 PowerShell 片段，
+> 或者改用 Git Bash / WSL 执行上面的 bash 片段。
+
+```powershell
+# PowerShell：以字节流写入，避免引号和编码被改写
+$req = @(
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+  '{"jsonrpc":"2.0","id":3,"method":"nope"}'
+) -join "`n"
+$req | & ".\_build\native\debug\build\cmd\main\main.exe"
+```
+
 ```bash
-# 往 stdin 喂 4 条消息，其中第 2 条是通知（按规范不应有回应）
+# bash / Git Bash / WSL：往 stdin 喂 4 条消息，其中第 2 条是通知（按规范不应有回应）
 printf '%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
   '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
@@ -117,35 +138,56 @@ npx @modelcontextprotocol/inspector _build/native/debug/build/cmd/main/main
 | 相关性打分与稳定排序 | ✅ 已实现并测试 |
 | HTTPS 客户端（原生，无 FFI） | ✅ 已实现 |
 | **`tools/call` → `search_packages`** | ✅ **已实现，联网检索真实生效** |
-| **`tools/call` → `get_package_api`** | ✅ **已实现，返回依赖表 / 版本历史 / 构建状态** |
+| **`tools/call` → `get_package_api`** | ✅ **已实现，返回依赖表 / 版本历史 / 构建状态 / 仓库 README 要点** |
 | `tools/call` → `suggest_dependencies` / `pack_project_context` | 🚧 返回可解释的"尚未实现"错误 |
 | 本地快照缓存 | 🚧 计划中 |
 
 ### 关于 `get_package_api` 的能力边界（重要且如实）
 
-mooncakes.io 的公开 API **不提供函数签名**，也不提供 README 正文
-（`metadata.readme` 只是文件名 `"README.md"`）。逐个探测候选的
-symbols / docs 端点也全部返回 404。
+mooncakes.io 的公开 API **不提供函数签名**：包详情里 `metadata.readme` 的取值
+只是文件名（`"README.md"`），逐个探测候选的 symbols / docs 端点也全部返回 404。
 
-因此本工具**不编造 API 摘要**，而是：
+而 MoonBit 包的 API 用法恰恰写在**仓库的 README** 里。所以本工具的做法是：
 
-1. 给出能核实的事实——依赖表、版本历史、许可证、构建状态、仓库地址；
-2. 明确告诉模型"上游没有函数签名"，并给出仓库地址让它去读权威来源。
+1. 给出 mooncakes.io 上能核实的事实——依赖表、版本历史、许可证、构建状态、仓库地址；
+2. 从包详情的 `repository` 字段推导出仓库地址，**把 README 取回来**，
+   以「章节导航 + 正文（上限 1800 字符）」的形式交给模型；
+3. 取不到时**明确说取不到**并给出仓库地址，**不编造 API 摘要**。
 
-> 这比给一份看起来专业的编造摘要安全得多：模型会去读真实来源，
-> 而不是相信一个可能过期或虚构的接口描述。
+README 是多源获取的，按顺序尝试、第一个成功即用（实测于 2026-09-17，中国大陆网络）：
 
-`search_packages` 的真实输出（可直接复跑）：
+| 源 | 实测结果 |
+|---|---|
+| `api.github.com/repos/<owner>/<repo>/readme` | 200，约 7 秒 |
+| `cdn.jsdelivr.net/gh/<owner>/<repo>@<branch>/README.md` | 200，约 2 秒 |
+| `raw.githubusercontent.com/...` | **时通时不通**（同一天里 curl 连续 19.5 秒无响应，MoonBit 客户端又能拿到 200） |
 
-```bash
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_packages","arguments":{"intent":"parquet","limit":3}}}' \
-| _build/native/debug/build/cmd/main/main
+只接受 **2xx** 响应：jsDelivr 冷缓存时先回一个 301，而 HTTP 客户端不跟随跳转，
+把跳转页当成 README 比取不到更糟。每次尝试有 **8 秒超时** ——
+因为 `raw.githubusercontent.com` 在国内的失败方式是连接被丢弃而不是返回 404，
+没有超时的话一次工具调用会永久挂住。
+
+> 这比给一份看起来专业的编造摘要安全得多：模型读到的是仓库里真实存在的文档，
+> 而不是一个可能过期或虚构的接口描述。
+
+`search_packages` 与 `get_package_api` 的真实输出（可直接复跑）：
+
+```powershell
+# PowerShell：先把请求写成无 BOM 的 UTF-8 文件，再用 cmd 的 type 送进 stdin。
+# 不要用 '...' | main.exe —— PowerShell 传给原生程序的 stdio 会改写引号与编码，
+# 结果是 -32700 Parse error。
+$req = @(
+  '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_packages","arguments":{"intent":"parquet","limit":2}}}'
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_package_api","arguments":{"name":"mizchi/parquet"}}}'
+) -join "`n"
+[System.IO.File]::WriteAllText("$PWD\req.jsonl", $req, [System.Text.UTF8Encoding]::new($false))
+cmd /c "type req.jsonl | _build\native\debug\build\cmd\main\main.exe"
 ```
 
 ```
 2 package(s) for "parquet":
 
-1. mizchi/parquet @ 0.2.1 — Apache-2.0, 1676 downloads, published 2026-04-25
+1. mizchi/parquet @ 0.2.1 — Apache-2.0, 1678 downloads, published 2026-04-25
    Parquet reader/writer for MoonBit.
    https://github.com/mizchi/parquet
 
@@ -153,7 +195,30 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_pac
    vibe coded lightweight OLAP database
    https://github.com/codeworm96/magpiedb
 
-Use get_package_api to read the real API surface of one of these before writing code.
+Use get_package_api to see its dependency table, version history and repository before writing code.
+```
+
+```
+mizchi/parquet @ 0.2.1
+  Description: Parquet reader/writer for MoonBit.
+  License: Apache-2.0
+  Repository: https://github.com/mizchi/parquet
+  Keywords: moonbit, parquet
+  Published: 2026-04-25
+  Build status: success
+
+Dependencies (2):
+  f4ah6o/duckdb  0.6.0
+  moonbitlang/x  0.4.40
+
+Version history (3, newest first):
+  0.2.1, 0.2.0, 0.1.0
+
+README sections: mizchi/parquet | Status | Benchmark | Development | Browser Playground | License
+
+README content (first 1800 of 2675 characters):
+# mizchi/parquet
+...
 ```
 
 未实现的工具会回一条**协议级可解释的失败结果**（`isError: true`）而不是超时或崩溃——

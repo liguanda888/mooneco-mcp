@@ -136,17 +136,71 @@ fn strip_git_suffix(segment : String) -> String {
 }
 
 ///|
-/// README 的候选 raw 地址，**按尝试顺序**返回。
+/// GitHub 官方 README 接口地址。
 ///
-/// 为什么要候选列表而不是单个地址：默认分支可能是 `main` 或 `master`，
-/// 文件名可能是 `README.md` 或 `README.mbt.md`（后者是 MoonBit 项目的约定，
-/// 例如 `moon new` 生成的就是它）。逐个尝试，第一个成功即用。
+/// 响应是 JSON，正文在 `content` 字段里，base64 编码。
+/// 把它放在首位的原因：**一次请求就拿到默认分支上的 README**，
+/// 不必猜 `main` / `master`；而且这条域名在国内网络下可直连。
+pub fn github_readme_api_url(owner : String, repo : String) -> String {
+  "https://api.github.com/repos/" + owner + "/" + repo + "/readme"
+}
+
+///|
+/// jsDelivr CDN 上的 README 地址（纯文本，无需解码）。
+fn jsdelivr_url(
+  owner : String,
+  repo : String,
+  branch : String,
+  file : String,
+) -> String {
+  "https://cdn.jsdelivr.net/gh/" +
+  owner +
+  "/" +
+  repo +
+  "@" +
+  branch +
+  "/" +
+  file
+}
+
+///|
+/// `raw.githubusercontent.com` 上的 README 地址（纯文本）。
+fn raw_github_url(
+  owner : String,
+  repo : String,
+  branch : String,
+  file : String,
+) -> String {
+  "https://raw.githubusercontent.com/" +
+  owner +
+  "/" +
+  repo +
+  "/" +
+  branch +
+  "/" +
+  file
+}
+
+///|
+/// 纯文本 README 的候选地址，**按尝试顺序**返回。
+///
+/// 实测（2026-09-17，中国大陆网络）：
+///   - `raw.githubusercontent.com` —— DNS 正常，但 TCP 连接**时通时不通**：
+///     同一天里 curl 连续超时（19.5s 无响应），而 MoonBit 客户端又能拿到 200。
+///     这正是不稳定连接的典型表现，不能依赖；
+///   - `cdn.jsdelivr.net` —— 同一份文件的镜像，实测稳定可直连。
+///
+/// 所以 jsDelivr 优先、raw 殿后。两个域名都列出来，是为了让这个工具
+/// 在国内外网络下都能用，而不是只对某一种网络环境有效。
+///
+/// 两种默认分支 × 两种文件名：MoonBit 项目的约定是 `README.mbt.md`
+/// （`moon new` 生成的就是它），所以它排在更通用的 `README.md` 之前。
 pub fn readme_url_candidates(owner : String, repo : String) -> Array[String] {
-  let base = "https://raw.githubusercontent.com/" + owner + "/" + repo + "/"
   [
-    base + "main/README.md",
-    base + "master/README.md",
-    base + "main/README.mbt.md",
-    base + "master/README.mbt.md",
+    jsdelivr_url(owner, repo, "main", "README.mbt.md"),
+    jsdelivr_url(owner, repo, "main", "README.md"),
+    jsdelivr_url(owner, repo, "master", "README.md"),
+    raw_github_url(owner, repo, "main", "README.md"),
+    raw_github_url(owner, repo, "master", "README.md"),
   ]
 }

@@ -14,6 +14,8 @@ pub async fn fetch_search(StringView, Int) -> Array[@mooncakes.PackageHit]?
 
 pub fn github_owner_repo(StringView) -> (String, String)?
 
+pub fn github_readme_api_url(String, String) -> String
+
 pub fn module_url(StringView) -> String
 
 pub fn percent_encode(StringView) -> String
